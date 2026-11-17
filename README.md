@@ -30,7 +30,8 @@ Diagnosticar una API HTTP con el modelo de madurez de Richardson y la semántica
 
 ## Complemento interactivo
 
-- **Archivo:** [`api_bajo_fuego.html`](api_bajo_fuego.html) — se abre con doble clic, sin servidor ni dependencias (solo carga tipografías de Google Fonts si hay conexión).
+- **En línea:** <https://cesaravegaf312.github.io/ARQ1-Taller_API_bajo_fuego/api_bajo_fuego.html>
+- **Sin conexión:** [`api_bajo_fuego.html`](api_bajo_fuego.html) — se abre con doble clic, sin servidor ni dependencias (solo carga tipografías de Google Fonts si hay conexión).
 - Todo lo que el grupo hace (hallazgos, decisiones, resultados, elecciones de consumidores) se guarda en el navegador. Si cierran la pestaña y la vuelven a abrir en el mismo equipo, siguen donde iban. Los datos de la consola (pedidos creados, pagos) se reinician al recargar.
 - La simulación es determinista: con la misma **semilla** y los mismos parámetros, todos los grupos ven los mismos números. Eso permite comparar entre grupos.
 
