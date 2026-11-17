@@ -1,0 +1,1288 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Taller interactivo del módulo 4 (REST): auditar una API mal diseñada, someterla a una red que pierde respuestas y rediseñar su contrato.">
+<style>body{margin:0}img{max-width:100%}[hidden]{display:none!important}</style>
+<title>API bajo fuego · ARQ1 Módulo 4</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+:root{
+  --ground:#ECEFF4; --surface:#FBFCFE; --sunk:#DFE4EC;
+  --ink:#141A24; --ink-2:#38424F; --muted:#68717F; --line:#D5DBE4; --line-2:#BEC6D2;
+  --real:#17518F; --doble:#9A2E63; --fuera:#8A93A1;
+  --real-soft:#DDE8F6; --doble-soft:#F7E3EC; --fuera-soft:#E5E9EF;
+  --ok:#1B6B4C; --warn:#8B5E12; --bad:#A5342D; --neutral:#4F5967;
+  --ok-soft:#DCEEE5; --warn-soft:#F6EBD5; --bad-soft:#F8E1DF; --neutral-soft:#E3E7ED;
+  --shadow:0 1px 2px rgba(20,26,36,.05), 0 12px 28px -20px rgba(20,26,36,.45);
+  --fd:'Archivo','Segoe UI',system-ui,sans-serif;
+  --fb:'IBM Plex Sans','Segoe UI',system-ui,sans-serif;
+  --fm:'IBM Plex Mono','Cascadia Mono',Consolas,monospace;
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --ground:#11161F; --surface:#19202A; --sunk:#212934;
+    --ink:#E4EAF2; --ink-2:#B9C3D0; --muted:#8A94A2; --line:#2A3441; --line-2:#3B4756;
+    --real:#6FA8E8; --doble:#E68CB5; --fuera:#79828F;
+    --real-soft:#152840; --doble-soft:#331825; --fuera-soft:#222A34;
+    --ok:#4FAD82; --warn:#CF9A44; --bad:#E2776E; --neutral:#98A2B0;
+    --ok-soft:#112A20; --warn-soft:#2C2211; --bad-soft:#2F1614; --neutral-soft:#242C36;
+    --shadow:0 1px 2px rgba(0,0,0,.45), 0 12px 28px -20px rgba(0,0,0,.9);
+  }
+}
+:root[data-theme="dark"]{
+  --ground:#11161F; --surface:#19202A; --sunk:#212934;
+  --ink:#E4EAF2; --ink-2:#B9C3D0; --muted:#8A94A2; --line:#2A3441; --line-2:#3B4756;
+  --real:#6FA8E8; --doble:#E68CB5; --fuera:#79828F;
+  --real-soft:#152840; --doble-soft:#331825; --fuera-soft:#222A34;
+  --ok:#4FAD82; --warn:#CF9A44; --bad:#E2776E; --neutral:#98A2B0;
+  --ok-soft:#112A20; --warn-soft:#2C2211; --bad-soft:#2F1614; --neutral-soft:#242C36;
+  --shadow:0 1px 2px rgba(0,0,0,.45), 0 12px 28px -20px rgba(0,0,0,.9);
+}
+*{box-sizing:border-box}
+body{background:var(--ground);color:var(--ink);font-family:var(--fb);font-size:16.5px;line-height:1.6;
+  -webkit-font-smoothing:antialiased;padding:0 20px 70px}
+.wrap{max-width:1120px;margin:0 auto}
+h1,h2,h3,h4{font-family:var(--fd);text-wrap:balance;margin:0;line-height:1.15;letter-spacing:-.014em}
+p{margin:0}
+p+p{margin-top:10px}
+code{font-family:var(--fm);font-size:.86em}
+a{color:var(--real)}
+.eyebrow{font-family:var(--fm);font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);font-weight:500}
+.mono{font-family:var(--fm)}
+
+header.hero{padding:54px 0 34px;border-bottom:1px solid var(--line);position:relative}
+.hero h1{font-size:clamp(36px,6.2vw,62px);font-weight:700;max-width:16ch;margin-top:14px}
+.hero h1 em{font-style:normal;color:var(--real)}
+.hero .sub{margin-top:20px;max-width:64ch;font-size:18.5px;color:var(--ink-2)}
+.thesis{margin-top:24px;border-left:3px solid var(--doble);padding:3px 0 3px 18px;max-width:60ch;font-size:18.5px}
+.key{margin-top:30px;display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));
+  border:1px solid var(--line);border-radius:3px;overflow:hidden;background:var(--surface)}
+.key>div{padding:14px 17px;border-right:1px solid var(--line)}
+.key>div:last-child{border-right:0}
+.key b{font-family:var(--fd);font-size:14.5px;display:flex;align-items:center;gap:9px;font-weight:600}
+.key .dot{width:14px;height:14px;border-radius:2px;flex:none;border:2px solid}
+.key p{font-size:14px;color:var(--muted);margin-top:4px;line-height:1.45}
+.theme{position:absolute;top:22px;right:0}
+
+section.lab{padding:52px 0;border-bottom:1px solid var(--line)}
+.lab-head{display:flex;gap:15px;align-items:baseline}
+.lab-num{font-family:var(--fm);font-size:12px;font-weight:600;color:var(--doble);letter-spacing:.08em;flex:none}
+.lab h2{font-size:clamp(24px,3.3vw,33px);font-weight:600}
+.lab .lede{max-width:70ch;margin-top:13px;color:var(--ink-2)}
+.stage{margin-top:26px;background:var(--surface);border:1px solid var(--line);border-radius:4px;
+  box-shadow:var(--shadow);overflow:hidden}
+.stage-body{padding:20px;min-width:0}
+.split{display:grid;grid-template-columns:minmax(0,1fr) 300px}
+.split>.rail{border-left:1px solid var(--line);padding:19px;background:var(--sunk);min-width:0}
+@media (max-width:880px){.split{grid-template-columns:1fr}.split>.rail{border-left:0;border-top:1px solid var(--line)}}
+
+.ctl{display:flex;flex-wrap:wrap;gap:9px;align-items:center;padding:11px 17px;border-bottom:1px solid var(--line);background:var(--sunk)}
+button{font-family:var(--fd);font-size:13.5px;font-weight:600;color:var(--ink);background:var(--surface);
+  border:1px solid var(--line-2);border-radius:3px;padding:6px 12px;cursor:pointer;line-height:1.25}
+button:hover:not(:disabled){border-color:var(--ink-2)}
+button:disabled{opacity:.35;cursor:default}
+button.primary{background:var(--ink);color:var(--ground);border-color:var(--ink)}
+button.on{background:var(--real);border-color:var(--real);color:#fff}
+:root[data-theme="dark"] button.on{color:#0C121A}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) button.on{color:#0C121A}}
+:focus-visible{outline:2px solid var(--doble);outline-offset:2px}
+.seg{display:inline-flex;border:1px solid var(--line-2);border-radius:3px;overflow:hidden;flex-wrap:wrap}
+.seg button{border:0;border-radius:0;border-right:1px solid var(--line-2)}
+.seg button:last-child{border-right:0}
+.count{font-family:var(--fm);font-size:12px;color:var(--muted);margin-left:auto;font-variant-numeric:tabular-nums}
+.ctl label{font-family:var(--fm);font-size:12px;color:var(--muted);display:flex;align-items:center;gap:7px}
+
+.rail h4{font-family:var(--fm);font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);
+  font-weight:500;margin-bottom:10px}
+.rail-block+.rail-block{margin-top:22px}
+.narration{font-size:14.8px;color:var(--ink-2);line-height:1.5}
+.narration b{color:var(--ink);font-weight:600}
+.narration li+li{margin-top:6px}
+.narration ul{margin:0;padding-left:18px}
+.pill{display:inline-flex;align-items:center;gap:6px;font-family:var(--fm);font-size:11.5px;font-weight:500;
+  padding:3px 8px;border-radius:2px;border:1px solid var(--line-2);color:var(--muted);background:var(--surface);white-space:nowrap}
+.pill.real{color:var(--real);border-color:var(--real);background:var(--real-soft)}
+.pill.doble{color:var(--doble);border-color:var(--doble);background:var(--doble-soft)}
+.pill.ok{color:var(--ok);border-color:var(--ok);background:var(--ok-soft)}
+.pill.warn{color:var(--warn);border-color:var(--warn);background:var(--warn-soft)}
+.pill.bad{color:var(--bad);border-color:var(--bad);background:var(--bad-soft)}
+.pill.neutral{color:var(--neutral);border-color:var(--line-2);background:var(--neutral-soft)}
+
+pre{font-family:var(--fm);font-size:12.6px;line-height:1.58;background:var(--sunk);border:1px solid var(--line);
+  border-radius:3px;padding:13px 15px;overflow:auto;margin:0;color:var(--ink-2)}
+.note{margin-top:24px;padding:15px 18px;background:var(--real-soft);border:1px solid var(--real);
+  border-radius:3px;font-size:15.5px;max-width:80ch;color:var(--ink)}
+.note.warn{background:var(--warn-soft);border-color:var(--warn)}
+.note.doble{background:var(--doble-soft);border-color:var(--doble)}
+.note.bad{background:var(--bad-soft);border-color:var(--bad)}
+.note b{font-family:var(--fd)}
+
+.chips{display:flex;flex-wrap:wrap;gap:7px}
+.chip{font-family:var(--fb);font-size:12.5px;font-weight:500;padding:4px 10px;border-radius:12px;
+  border:1px solid var(--line-2);background:var(--surface);color:var(--ink-2);cursor:pointer}
+.chip:hover{border-color:var(--ink-2);color:var(--ink)}
+.form{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:11px;margin-top:6px;align-items:end}
+.form label,.lbl{display:block;font-family:var(--fm);font-size:10.5px;letter-spacing:.07em;text-transform:uppercase;
+  color:var(--muted);margin-bottom:4px}
+input[type=text],input[type=number],select,textarea{font-family:var(--fm);font-size:12.8px;padding:7px 9px;border:1px solid var(--line-2);
+  border-radius:3px;background:var(--surface);color:var(--ink);width:100%}
+textarea{resize:vertical;line-height:1.5}
+.panes{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.15fr);gap:18px}
+@media (max-width:760px){.panes{grid-template-columns:1fr}}
+h5{font-family:var(--fm);font-size:10.5px;letter-spacing:.11em;text-transform:uppercase;color:var(--muted);
+  font-weight:500;margin:0 0 7px}
+table{border-collapse:collapse;width:100%;font-size:13px}
+.tbl th{font-family:var(--fm);font-size:10.5px;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);
+  text-align:left;font-weight:500;padding:7px 9px;border-bottom:1px solid var(--line-2);vertical-align:bottom}
+.tbl td{padding:7px 9px;border-bottom:1px solid var(--line);color:var(--ink-2);vertical-align:top;font-variant-numeric:tabular-nums}
+.tbl td.m{font-family:var(--fm);font-size:12.4px}
+.tbl tr:last-child td{border-bottom:0}
+.tbl td.num,.tbl th.num{text-align:right}
+.tbl tr.hit td{background:var(--ok-soft)}
+.empty{font-family:var(--fm);font-size:12.5px;color:var(--muted);padding:12px 10px;border:1px dashed var(--line-2);
+  border-radius:3px;text-align:center}
+.scroller{overflow-x:auto}
+
+/* consola */
+.cons{display:grid;gap:16px}
+.reqline{display:grid;grid-template-columns:104px minmax(0,1fr) auto;gap:8px}
+.resp{border:1px solid var(--line);border-radius:3px;background:var(--sunk);min-height:160px;overflow:hidden}
+.resp .st{display:flex;gap:10px;align-items:center;padding:8px 12px;border-bottom:1px solid var(--line);font-family:var(--fm);font-size:12.5px;flex-wrap:wrap;background:var(--surface)}
+.resp .hd{font-family:var(--fm);font-size:12px;padding:8px 12px;border-bottom:1px solid var(--line);color:var(--ink-2);white-space:pre-wrap;word-break:break-all;line-height:1.5}
+.resp pre{border:0;border-radius:0;max-height:320px;white-space:pre}
+.resp .empty{border:0}
+.hist{max-height:230px;overflow:auto;border:1px solid var(--line);border-radius:3px;background:var(--surface)}
+.hist div{display:grid;grid-template-columns:38px 66px minmax(0,1fr) auto;gap:10px;padding:5px 10px;font-family:var(--fm);font-size:12px;border-bottom:1px solid var(--line);cursor:pointer;align-items:center}
+.hist div:hover{background:var(--sunk)}
+.hist div:last-child{border-bottom:0}
+.hist .p{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tools{display:flex;gap:8px;flex-wrap:wrap}
+
+/* marcador */
+.score{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px}
+.card{border:1px solid var(--line);border-radius:3px;padding:12px 14px;background:var(--sunk)}
+.card h6{font-family:var(--fm);font-size:10px;letter-spacing:.09em;text-transform:uppercase;color:var(--muted);font-weight:500;margin:0}
+.card .v{font-family:var(--fd);font-size:28px;font-weight:700;letter-spacing:-.02em;margin-top:6px;font-variant-numeric:tabular-nums;line-height:1.1}
+.card p{font-size:12.8px;color:var(--muted);margin-top:6px;line-height:1.4}
+.card.bad{border-color:var(--bad);background:var(--bad-soft)} .card.bad .v{color:var(--bad)}
+.card.ok .v{color:var(--ok)}
+.log{font-family:var(--fm);font-size:12.2px;line-height:1.5;color:var(--ink-2);max-height:260px;overflow:auto;border:1px solid var(--line);border-radius:3px;background:var(--surface)}
+.log div{padding:4px 10px;border-bottom:1px solid var(--line)}
+.log div:last-child{border-bottom:0}
+.log .t{color:var(--muted);display:inline-block;min-width:74px}
+.params{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:14px 20px}
+.params .seg{display:flex}
+.params .seg button{flex:1}
+
+/* decisiones */
+.decs{display:grid;gap:10px}
+.dec{display:grid;grid-template-columns:22px minmax(0,1fr);gap:10px;padding:12px 14px;border:1px solid var(--line);border-radius:3px;background:var(--surface);cursor:pointer;text-align:left;font-family:var(--fb);font-weight:400;font-size:14px;color:var(--ink-2);width:100%}
+.dec b{font-family:var(--fd);font-size:15px;color:var(--ink);display:block;font-weight:600}
+.dec .box{width:18px;height:18px;border:2px solid var(--line-2);border-radius:3px;margin-top:2px;display:grid;place-items:center;font-size:12px;color:#fff}
+.dec.on{border-color:var(--real);background:var(--real-soft)}
+.dec.on .box{background:var(--real);border-color:var(--real)}
+.dec .mv{font-family:var(--fm);font-size:11px;color:var(--muted);margin-top:4px;display:block}
+.dec:disabled{opacity:.45;cursor:not-allowed}
+.dec.trap.on{border-color:var(--bad);background:var(--bad-soft)}
+.dec.trap.on .box{background:var(--bad);border-color:var(--bad)}
+.level{font-family:var(--fd);font-size:52px;font-weight:700;line-height:1;letter-spacing:-.03em}
+.delta-bad{color:var(--bad);font-weight:600}
+.delta-ok{color:var(--ok);font-weight:600}
+
+/* consumidores */
+.cons5{display:grid;gap:14px}
+.consumer{border:1px solid var(--line);border-radius:3px;background:var(--surface);overflow:hidden}
+.consumer header{display:flex;gap:12px;align-items:baseline;justify-content:space-between;padding:12px 16px;border-bottom:1px solid var(--line);background:var(--sunk);flex-wrap:wrap}
+.consumer header b{font-family:var(--fd);font-size:16px}
+.consumer .body{padding:14px 16px;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:18px}
+@media (max-width:760px){.consumer .body{grid-template-columns:1fr}}
+.consumer ul{margin:6px 0 0;padding-left:18px;font-size:14px;color:var(--ink-2)}
+.opts{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px}
+.opts button{font-size:12.5px;padding:5px 10px}
+.reveal{border-top:1px solid var(--line);padding:12px 16px;font-size:14.5px;color:var(--ink-2)}
+.reveal .grid5{display:grid;gap:6px;margin-top:10px}
+.reveal .row{display:grid;grid-template-columns:150px 96px minmax(0,1fr);gap:10px;font-size:13.5px;padding:6px 8px;border-radius:3px;align-items:start}
+.reveal .row.sel{background:var(--real-soft);box-shadow:inset 3px 0 0 var(--real)}
+@media (max-width:700px){.reveal .row{grid-template-columns:1fr}}
+.cols2{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:18px}
+@media (max-width:820px){.cols2{grid-template-columns:1fr}}
+.rounds td:first-child{font-family:var(--fd);font-weight:600;color:var(--ink);white-space:nowrap}
+footer{padding:44px 0 0;color:var(--muted);font-size:15px;max-width:78ch}
+footer p+p{margin-top:12px}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="hero">
+  <button class="theme" id="theme" type="button" title="Cambiar tema">Tema: auto</button>
+  <div class="eyebrow">Diseño y Arquitectura de Software · Módulo 4 · REST · Taller</div>
+  <h1>API <em>bajo fuego</em></h1>
+  <p class="sub">La API de pedidos de Inventarium funciona en la demo: cada petición, enviada una vez y con buena red, responde bien. En este taller la auditan, la ponen frente a una red móvil que pierde respuestas y rediseñan su contrato hasta que el mismo caos deje de cobrar dos veces.</p>
+  <p class="thesis">Una API puede responder bien a cada petición y aun así cobrar dos veces. Lo que lo evita no está en el código de cada endpoint: está en el contrato. Qué se puede reintentar, qué se puede cachear y qué significa cada código.</p>
+  <div class="key">
+    <div><b><span class="dot" style="border-color:var(--bad);background:var(--bad-soft)"></span>v0 · lo que hay</b><p>Siete endpoints con verbos en la URI, errores escondidos en 200 y un GET que cancela pedidos.</p></div>
+    <div><b><span class="dot" style="border-color:var(--warn);background:var(--warn-soft)"></span>La red · lo que pasa</b><p>Latencia, respuestas que se pierden después de que el servidor ya procesó y clientes que reintentan.</p></div>
+    <div><b><span class="dot" style="border-color:var(--real);background:var(--real-soft)"></span>v1 · lo que ustedes diseñan</b><p>Seis decisiones de contrato. Cada una cambia el comportamiento real del servidor simulado.</p></div>
+    <div><b><span class="dot" style="border-color:var(--doble);background:var(--doble-soft)"></span>Los consumidores</b><p>La misma capacidad para cinco consumidores distintos. No todos deben recibirla igual.</p></div>
+  </div>
+</header>
+
+<section class="lab" id="agenda">
+  <div class="lab-head"><span class="lab-num">00</span><h2>Cómo se juega</h2></div>
+  <p class="lede">Grupos de 3 o 4 personas. Cada grupo trabaja en su propia copia de esta página (se guarda sola en el navegador). Al final exportan un Markdown con lo que encontraron y decidieron; ese archivo es la entrega. El servidor es una simulación dentro de la página: no hay que instalar nada ni hay red real de por medio.</p>
+  <div class="stage"><div class="stage-body scroller">
+    <table class="tbl rounds">
+      <thead><tr><th>Ronda</th><th class="num">Min</th><th>Qué hacen</th><th>Qué sale de aquí</th></tr></thead>
+      <tbody>
+        <tr><td>Encuadre</td><td class="num m">10</td><td>El docente presenta el caso: Inventarium abre ventas por app móvil antes del Black Friday.</td><td>—</td></tr>
+        <tr><td>01 · Auditoría</td><td class="num m">25</td><td>Exploran la API v0 con la consola. Registran cada defecto con su evidencia.</td><td>Tabla de hallazgos</td></tr>
+        <tr><td>02 · La red miente</td><td class="num m">15</td><td>Lanzan tráfico de clientes móviles contra la v0 con la red de la clase.</td><td>Marcador «antes»</td></tr>
+        <tr><td>03 · Rediseño</td><td class="num m">35</td><td>Activan decisiones de contrato, las prueban en la consola y repiten el mismo caos.</td><td>Contrato v1 y tabla antes/después</td></tr>
+        <tr><td>04 · Cinco consumidores</td><td class="num m">20</td><td>Eligen cómo exponer la misma capacidad a cinco consumidores distintos y revelan las consecuencias.</td><td>Matriz de consumidores</td></tr>
+        <tr><td>Cierre</td><td class="num m">15</td><td>Exportan el Markdown. Dos grupos muestran su tabla antes/después.</td><td>Entrega</td></tr>
+      </tbody>
+    </table>
+  </div></div>
+</section>
+
+<!-- ============ LAB 01 ============ -->
+<section class="lab" id="lab1">
+  <div class="lab-head"><span class="lab-num">01</span><h2>Auditoría: qué hace realmente la API v0</h2></div>
+  <p class="lede">Esta es la API que el proveedor entregó. Pruébenla como lo haría un cliente: peticiones válidas, inválidas, repetidas y sobre recursos que no existen. Cada defecto que registren debe citar una petición del historial; sin evidencia no cuenta. Hay pedidos de prueba con id <code>1001</code>, <code>1002</code> (ya pagado) y <code>1003</code>.</p>
+
+  <div class="stage split">
+    <div id="console1"></div>
+    <aside class="rail">
+      <div class="rail-block"><h4>Endpoints v0</h4>
+        <div class="narration mono" style="font-size:12.6px;line-height:1.75">GET /getProductos<br>GET /getProducto?id=SKU-…<br>POST /crearPedido<br>GET /pedido?id=…<br>POST /pagarPedido<br>GET /cancelarPedido?id=…<br>POST /actualizarPedido</div>
+      </div>
+      <div class="rail-block"><h4>Qué mirar</h4>
+        <ul class="narration">
+          <li><b>La URI</b>: ¿identifica un recurso o nombra un procedimiento?</li>
+          <li><b>El método</b>: ¿es seguro? ¿es idempotente? ¿coincide con lo que hace?</li>
+          <li><b>El código</b>: ¿un intermediario entendería el resultado sin leer el cuerpo?</li>
+          <li><b>Los encabezados</b>: ¿hay algo que permita cachear o revalidar?</li>
+          <li><b>La repetición</b>: ¿qué pasa si envían lo mismo dos veces?</li>
+        </ul>
+      </div>
+    </aside>
+  </div>
+
+  <div class="stage">
+    <div class="ctl"><span class="eyebrow">Hallazgos del grupo</span><span class="count" id="hcount"></span></div>
+    <div class="stage-body">
+      <div class="form">
+        <div><label for="fEp">Endpoint</label><select id="fEp"></select></div>
+        <div><label for="fNivel">Nivel Richardson</label><select id="fNivel"><option value="">—</option><option>0</option><option>1</option><option>2</option><option>3</option></select></div>
+        <div style="grid-column:span 2"><label for="fCat">Defecto</label><select id="fCat"></select></div>
+        <div><label for="fEv">Evidencia</label><select id="fEv"></select></div>
+      </div>
+      <div class="form" style="grid-template-columns:minmax(0,1fr) auto">
+        <div><label for="fNota">Qué demuestra la evidencia (una línea)</label><input type="text" id="fNota" placeholder="Ej.: el mismo cuerpo dos veces creó los pedidos 1004 y 1005"></div>
+        <div><button class="primary" id="fAdd" type="button">Registrar hallazgo</button></div>
+      </div>
+      <div style="margin-top:18px" class="scroller" id="hTable"></div>
+    </div>
+  </div>
+
+</section>
+
+<!-- ============ LAB 02 ============ -->
+<section class="lab" id="lab2">
+  <div class="lab-head"><span class="lab-num">02</span><h2>La red miente</h2></div>
+  <p class="lede">Ahora la v0 recibe clientes móviles reales: miran el catálogo varias veces, crean un pedido y lo pagan. La red tiene latencia y a veces pierde la respuesta <b>después</b> de que el servidor ya procesó. El cliente no sabe si su petición llegó; solo sabe que no recibió respuesta, y reintenta. Toda la clase usa la misma semilla, así que con los mismos parámetros todos ven los mismos números.</p>
+
+  <div class="stage">
+    <div class="ctl"><span class="eyebrow">La red de la clase</span><span class="count">tiempo de espera del cliente: 2 s · reintentos con espera exponencial</span></div>
+    <div class="stage-body">
+      <div class="params" id="params"></div>
+      <div class="tools" style="margin-top:18px;align-items:center">
+        <button class="primary" id="runV0" type="button">Lanzar tráfico contra la v0</button>
+        <span class="narration" style="font-size:13.5px">Simula 15 minutos de tráfico. A los 5 minutos el catálogo cambia de precios.</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="stage" id="v0out" hidden>
+    <div class="ctl"><span class="eyebrow">Marcador · v0</span><span class="count" id="v0params"></span></div>
+    <div class="stage-body">
+      <div class="score" id="v0score"></div>
+      <h5 style="margin-top:20px">Lo que vio el servidor (muestra)</h5>
+      <div class="log" id="v0log"></div>
+    </div>
+  </div>
+  <div class="note warn"><b>Antes de pasar a la ronda 3.</b> Para cada número en rojo, el grupo escribe en una línea qué decisión de contrato lo habría evitado. Lo van a comprobar en la siguiente ronda.</div>
+</section>
+
+<!-- ============ LAB 03 ============ -->
+<section class="lab" id="lab3">
+  <div class="lab-head"><span class="lab-num">03</span><h2>Rediseño: el contrato v1</h2></div>
+  <p class="lede">Activen las decisiones que defienden. Cada una cambia el servidor simulado: la consola de abajo acepta las rutas v1 en cuanto activan los recursos. Prueben cada decisión en la consola antes de repetir el caos. Las rutas v0 siguen vivas, como en una migración real, mientras los clientes viejos se actualizan.</p>
+
+  <div class="stage split">
+    <div class="stage-body">
+      <div class="decs" id="decs"></div>
+      <div style="margin-top:16px"><h5>La trampa</h5><div id="trapBox"></div></div>
+    </div>
+    <aside class="rail">
+      <div class="rail-block"><h4>Nivel de Richardson</h4><div class="level" id="lvl">0</div><p class="narration" id="lvlTxt" style="margin-top:8px"></p></div>
+      <div class="rail-block"><h4>Sobre el nivel 3</h4><p class="narration">No está entre las decisiones a propósito. Hipermedia se paga cuando hay clientes que no se controlan y deben adaptarse sin redesplegar. Esta API la consumen una app propia y un panel interno: el nivel 2 es el punto de equilibrio.</p></div>
+    </aside>
+  </div>
+
+  <div class="stage"><div id="console2"></div></div>
+
+  <div class="stage">
+    <div class="ctl"><span class="eyebrow">El mismo caos, antes y después</span><span class="count" id="cmpParams"></span></div>
+    <div class="stage-body">
+      <div class="tools" style="align-items:center"><button class="primary" id="runCmp" type="button">Repetir el mismo caos con la v1</button><span class="narration" style="font-size:13.5px">Usa los parámetros de la ronda 2 y la misma semilla: cada respuesta que se perdió antes se pierde igual ahora.</span></div>
+      <div id="cmpOut" style="margin-top:18px"></div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ LAB 04 ============ -->
+<section class="lab" id="lab4">
+  <div class="lab-head"><span class="lab-num">04</span><h2>La misma capacidad, cinco consumidores</h2></div>
+  <p class="lede">La capacidad es una sola: consultar y crear pedidos de Inventarium, con las reglas que acaban de diseñar. Pero no la consume un solo cliente. Para cada uno de estos cinco consumidores, elijan cómo exponérsela y justifiquen la elección en una línea. Varias respuestas son defendibles; algunas fallan por razones concretas. Las consecuencias se revelan cuando el grupo haya elegido y justificado las cinco.</p>
+
+  <div class="cons5" id="cons5"></div>
+  <div class="tools" style="margin-top:18px;align-items:center"><button class="primary" id="revealBtn" type="button">Revelar consecuencias</button><span class="narration" id="revealHint" style="font-size:13.5px"></span></div>
+
+  <div id="lab4after" hidden>
+    <div class="note doble"><b>MCP es un estilo de integración, no un patrón.</b> Model Context Protocol define cómo una aplicación con un modelo de lenguaje descubre y usa capacidades externas: <i>tools</i> (acciones), <i>resources</i> (datos para leer) y <i>prompts</i> (plantillas), con mensajes JSON-RPC 2.0 sobre stdio o Streamable HTTP. No decide cómo se organiza el sistema. En la práctica es un adaptador más sobre la API que ya existe: se genera desde el mismo contrato, aplica las mismas reglas de negocio y convive con los demás consumidores. Es un adaptador de entrada en el sentido de la arquitectura hexagonal del módulo 5: un puerto nuevo, el mismo núcleo. El Technology Radar de Thoughtworks (vol. 34, abril de 2026) advierte contra «MCP by default»: exponerlo todo por MCP porque sí, sin un consumidor que lo necesite.</div>
+    <div class="note bad"><b>El puente con la ronda 3.</b> Un agente reintenta por diseño: si una herramienta no responde o la respuesta no le sirve, vuelve a llamarla. Si la escritura que hay detrás no es idempotente, el agente cobra dos veces, igual que la app móvil de la ronda 2, pero sin una persona que lo note en pantalla. Cuando el consumidor es un agente, la Idempotency-Key en toda escritura deja de ser una buena práctica y pasa a ser requisito.</div>
+
+    <div class="stage">
+      <div class="ctl"><span class="eyebrow">La herramienta MCP que saldría de su contrato v1</span><span class="count" id="toolSrc"></span></div>
+      <div class="stage-body cols2">
+        <div>
+          <h5>Definición de la tool (lo que el agente recibe en tools/list)</h5>
+          <pre id="toolJson"></pre>
+        </div>
+        <div>
+          <h5>Qué hace el adaptador con un tools/call</h5>
+          <pre id="toolMap"></pre>
+          <div class="narration" id="toolNotes" style="margin-top:14px"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ LAB 05 ============ -->
+<section class="lab" id="lab5">
+  <div class="lab-head"><span class="lab-num">05</span><h2>Entrega</h2></div>
+  <p class="lede">El Markdown reúne los hallazgos, las decisiones del contrato v1, la tabla antes/después, la matriz de consumidores y las peticiones citadas como evidencia. Escriban el nombre del grupo, descárguenlo y súbanlo a la plataforma junto con la plantilla del contrato.</p>
+  <div class="stage">
+    <div class="ctl">
+      <label for="grupo">Grupo</label><input type="text" id="grupo" style="max-width:260px" placeholder="Nombre e integrantes">
+      <button id="copyMd" type="button">Copiar</button><button class="primary" id="dlMd" type="button">Descargar .md</button>
+      <button id="resetAll" type="button" style="margin-left:auto">Borrar todo y empezar de nuevo</button>
+    </div>
+    <div class="stage-body"><pre id="md" style="max-height:420px"></pre></div>
+  </div>
+</section>
+
+<footer>
+  <p>Diplomado en Diseño y Arquitectura de Software · Universidad de La Sabana · Módulo 4, material de taller.</p>
+  <p>El servidor y la red son simulaciones deterministas: con la misma semilla y los mismos parámetros dan los mismos números en cualquier equipo. Los datos de la consola se reinician al recargar la página; los hallazgos, las decisiones y los resultados se conservan en este navegador.</p>
+</footer>
+</div>
+
+<!-- ===================================================================
+     NÚCLEO: servidor simulado y simulador de red. No toca el DOM.
+     =================================================================== -->
+<script id="core">
+(function(G){
+'use strict';
+const enc=new TextEncoder();
+const byteLen=s=>enc.encode(s).length;
+function hash32(str){let h=0x811c9dc5;for(let i=0;i<str.length;i++){h^=str.charCodeAt(i);h=Math.imul(h,0x01000193);}return h>>>0;}
+function mulberry32(a){return function(){a|=0;a=(a+0x6D2B79F5)|0;let t=Math.imul(a^(a>>>15),1|a);t=(t+Math.imul(t^(t>>>7),61|t))^t;return((t^(t>>>14))>>>0)/4294967296;};}
+/* Número pseudoaleatorio que depende solo de sus argumentos: la misma petición
+   del mismo cliente tiene la misma suerte en la v0 y en la v1. */
+function rnd(){const r=mulberry32(hash32(Array.prototype.join.call(arguments,'|')));r();return r();}
+
+const REASON={200:'OK',201:'Created',204:'No Content',304:'Not Modified',400:'Bad Request',404:'Not Found',405:'Method Not Allowed',409:'Conflict',412:'Precondition Failed',415:'Unsupported Media Type',422:'Unprocessable Content',500:'Internal Server Error'};
+
+/* ---------- catálogo (~40 KB en JSON) ---------- */
+const MARCAS=['Lumen','Kordia','Axon','Brisa','Norte','Vantix','Okto','Selva'];
+const CATS=[['Computadores',['Portátil','Mini PC','Todo en uno']],['Periféricos',['Teclado mecánico','Mouse inalámbrico','Base refrigerante']],['Audio',['Audífonos','Parlante','Barra de sonido']],['Redes',['Router','Repetidor wifi','Switch']],['Monitores',['Monitor','Brazo para monitor','Monitor curvo']],['Almacenamiento',['Disco SSD','Memoria USB','Disco externo']]];
+const RASGOS=['garantía directa con el fabricante','envío en 24 horas en Bogotá y Medellín','compatible con Windows, macOS y Linux','incluye cable USB-C y manual en español','empaque reciclable certificado','soporte técnico en Colombia','actualizaciones de firmware disponibles','factura electrónica con IVA discriminado'];
+function baseCatalog(){
+  const R=mulberry32(4242),L=[];
+  for(let i=0;i<120;i++){
+    const c=CATS[i%CATS.length],tipo=c[1][Math.floor(R()*c[1].length)];
+    const marca=MARCAS[Math.floor(R()*MARCAS.length)];
+    const modelo=['S','M','X','Pro','Air','Max'][Math.floor(R()*6)]+(10+Math.floor(R()*90));
+    const precio=Math.floor((49900+R()*2950000)/1000)*1000+900;
+    const r1=RASGOS[Math.floor(R()*RASGOS.length)],r2=RASGOS[Math.floor(R()*RASGOS.length)];
+    const sku='SKU-'+(1001+i);
+    L.push({sku,nombre:tipo+' '+marca+' '+modelo,marca,categoria:c[0],precio,moneda:'COP',stock:Math.floor(R()*80),
+      garantiaMeses:[6,12,24][Math.floor(R()*3)],descripcion:tipo+' '+marca+' '+modelo+' para oficina y hogar: '+r1+'; '+r2+'.',
+      imagen:'https://cdn.inventarium.example/img/'+sku+'.webp'});
+  }
+  return L;
+}
+const BASE=baseCatalog();
+const catCache=new Map();
+function catalog(v){
+  if(!catCache.has(v)){
+    const list=BASE.map((p,i)=>{let precio=p.precio;for(let k=2;k<=v;k++){if((i*k)%7===0)precio=Math.round(precio*(k%2?1.05:0.9)/100)*100;}return Object.assign({},p,{precio});});
+    catCache.set(v,{list,bySku:new Map(list.map(p=>[p.sku,p]))});
+  }
+  return catCache.get(v);
+}
+
+const DEFAULT_CFG={recursos:false,codigos:false,idem:false,cache:false,cancelar:false,patch:false};
+const JSONCT='application/json; charset=utf-8';
+const PTYPE='https://api.inventarium.example/problemas/';
+const MEDIOS=['tarjeta','pse','nequi'];
+
+function sortKeys(v){if(Array.isArray(v))return v.map(sortKeys);if(v&&typeof v==='object'){const o={};Object.keys(v).sort().forEach(k=>{o[k]=sortKeys(v[k]);});return o;}return v;}
+function canon(raw){try{return JSON.stringify(sortKeys(JSON.parse(raw)));}catch(e){return String(raw||'').trim();}}
+function clone(r){return{status:r.status,statusText:r.statusText,headers:Object.assign({},r.headers),body:r.body};}
+function parseBody(raw){if(raw==null||String(raw).trim()==='')return{ok:true,val:{}};try{return{ok:true,val:JSON.parse(raw)};}catch(e){return{ok:false,err:e};}}
+function etagOf(obj){return '"'+hash32(JSON.stringify(obj)).toString(16)+'"';}
+function weakEq(a,b){const s=x=>x.trim().replace(/^W\//,'');return s(a)===s(b);}
+function respBytes(r){let n=byteLen('HTTP/1.1 '+r.status+' '+r.statusText+'\r\n');for(const k in r.headers)n+=byteLen(k+': '+r.headers[k]+'\r\n');return n+2+byteLen(r.body||'');}
+
+function createServer(cfg,opts){
+  opts=opts||{};
+  const d=Object.assign({},DEFAULT_CFG,cfg||{});
+  const S={now:0,catalogVersion:1,versionFn:opts.versionFn||null,orders:new Map(),payments:new Map(),idem:new Map(),nextOrder:1001,nextPay:5001};
+  const ver=()=>S.versionFn?S.versionFn(S.now):S.catalogVersion;
+  const cat=()=>catalog(ver());
+  const stamp=()=>new Date(Date.UTC(2026,10,27,8,0,0)+Math.round(S.now*1000)).toISOString().replace('.000Z','Z');
+
+  /* ---- respuestas ---- */
+  function mk(status,headers,body){
+    const h=Object.assign({},headers);
+    if(body!=null&&status!==304&&status!==204)h['Content-Length']=String(byteLen(body));
+    return{status,statusText:REASON[status]||'',headers:h,body:body==null?'':body};
+  }
+  const ok=(status,obj,extra)=>mk(status,Object.assign({'Content-Type':JSONCT},extra||{}),JSON.stringify(obj));
+  const legacy=(status,obj)=>mk(status,{'X-Powered-By':'Express','Content-Type':JSONCT},JSON.stringify(obj));
+  const expressNotFound=(m,p)=>mk(404,{'X-Powered-By':'Express','Content-Type':'text/html; charset=utf-8'},
+    '<!DOCTYPE html>\n<html lang="en">\n<head>\n<meta charset="utf-8">\n<title>Error</title>\n</head>\n<body>\n<pre>Cannot '+m+' '+p+'</pre>\n</body>\n</html>\n');
+  const crash=(err,fn,line)=>legacy(500,{error:'Error interno del servidor',detalle:err+'\n    at '+fn+' (/app/src/rutas/pedidos.js:'+line+':17)\n    at Layer.handle [as handle_request] (/app/node_modules/express/lib/router/layer.js:95:5)\n    at next (/app/node_modules/express/lib/router/route.js:149:13)'});
+  /* Error del contrato v1. Sin la decisión «codigos», la v1 hereda la costumbre de la v0:
+     los errores del cliente revientan en 500 y los demás se esconden en un 200. */
+  function fail(status,slug,title,detail,extra,hdrs){
+    if(d.codigos)return mk(status,Object.assign({'Content-Type':'application/problem+json'},hdrs||{}),JSON.stringify(Object.assign({type:PTYPE+slug,title,status,detail},extra||{})));
+    if(status===400||status===415||status===422)return crash('Error: '+detail,'validar',57);
+    return ok(200,Object.assign({error:detail},extra||{}));
+  }
+  /* GET de una representación: con la decisión «cache» lleva ETag y Cache-Control
+     y responde 304 sin cuerpo si If-None-Match coincide (comparación débil, RFC 9110 §13.1.2). */
+  function representation(R,obj,cc,extra){
+    const body=JSON.stringify(obj);
+    if(!d.cache)return mk(200,Object.assign({'Content-Type':JSONCT},extra||{}),body);
+    const etag='"'+hash32(body).toString(16)+'"';
+    const inm=R.headers['if-none-match'];
+    if(inm&&(inm.trim()==='*'||inm.split(',').some(x=>weakEq(x,etag))))return mk(304,{'ETag':etag,'Cache-Control':cc},null);
+    return mk(200,Object.assign({'Content-Type':JSONCT,'ETag':etag,'Cache-Control':cc},extra||{}),body);
+  }
+
+  /* ---- dominio ---- */
+  function validItems(arr){
+    const errores=[];
+    if(!Array.isArray(arr)||arr.length===0){errores.push({campo:'items',problema:'debe tener al menos un ítem'});return errores;}
+    arr.forEach((it,i)=>{
+      if(!it||typeof it!=='object'||!cat().bySku.get(it.sku))errores.push({campo:'items['+i+'].sku',problema:'producto inexistente'});
+      if(!it||!Number.isInteger(it.cantidad)||it.cantidad<1)errores.push({campo:'items['+i+'].cantidad',problema:'entero mayor o igual a 1'});
+    });
+    return errores;
+  }
+  function priceItems(arr){const c=cat();return arr.map(it=>{const p=c.bySku.get(it.sku);return{sku:it.sku,nombre:p.nombre,cantidad:it.cantidad,precioUnitario:p.precio};});}
+  const totalOf=its=>its.reduce((a,x)=>a+x.precioUnitario*x.cantidad,0);
+  function newOrder(cliente,items,direccion){
+    const its=priceItems(items);
+    const o={id:S.nextOrder++,cliente:cliente==null?null:cliente,items:its,total:totalOf(its),direccion:direccion==null?null:direccion,notas:null,estado:'pendiente',pagado:0,creado:stamp()};
+    S.orders.set(o.id,o);return o;
+  }
+  function addPayment(o,monto,medio){
+    const p={id:S.nextPay++,pedido:o.id,monto,medio:medio||'tarjeta',fecha:stamp()};
+    S.payments.set(p.id,p);o.pagado+=monto;
+    if(o.estado!=='cancelado'&&o.pagado>=o.total)o.estado='pagado';
+    return p;
+  }
+  function cancelOrder(o){o.estado='cancelado';}
+
+  /* ---- API v0: tal como la entregó el proveedor ---- */
+  function v0(R,m,p,q){
+    const get=m==='GET'||m==='HEAD';
+    switch(p){
+      case '/getProductos':
+        if(!get)break;
+        return legacy(200,cat().list);
+      case '/getProducto':{
+        if(!get)break;
+        const pr=cat().bySku.get(q.get('id'));
+        return pr?legacy(200,pr):legacy(200,{error:'no existe'});}
+      case '/pedido':{
+        if(!get)break;
+        const o=S.orders.get(Number(q.get('id')));
+        return o?legacy(200,o):legacy(200,{error:'no existe'});}
+      case '/cancelarPedido':{
+        if(!get)break;
+        const o=S.orders.get(Number(q.get('id')));
+        if(!o)return legacy(200,{error:'no existe'});
+        cancelOrder(o);return legacy(200,{ok:true});}
+      case '/crearPedido':{
+        if(m!=='POST')break;
+        const b=parseBody(R.body);if(!b.ok)return crash('SyntaxError: '+b.err.message,'jsonParser',12);
+        const x=b.val||{};
+        if(!Array.isArray(x.items))return crash("TypeError: Cannot read properties of undefined (reading 'map')",'crearPedido',88);
+        for(const it of x.items){if(!it||!cat().bySku.get(it.sku))return crash("TypeError: Cannot read properties of undefined (reading 'precio')",'calcularTotal',131);}
+        const o=newOrder(x.cliente,x.items.map(it=>({sku:it.sku,cantidad:it.cantidad})),x.direccion);
+        return legacy(200,{ok:true,id:o.id,total:o.total});}
+      case '/pagarPedido':{
+        if(m!=='POST')break;
+        const b=parseBody(R.body);if(!b.ok)return crash('SyntaxError: '+b.err.message,'jsonParser',12);
+        const x=b.val||{};
+        const o=S.orders.get(Number(x.id));
+        if(!o)return legacy(200,{error:'pedido no existe'});
+        if(typeof x.monto!=='number')return crash("TypeError: Cannot read properties of undefined (reading 'toFixed')",'registrarPago',164);
+        const pg=addPayment(o,x.monto,x.medio);
+        return legacy(200,{ok:true,pago:pg.id,estado:o.estado});}
+      case '/actualizarPedido':{
+        if(m!=='POST')break;
+        const b=parseBody(R.body);if(!b.ok)return crash('SyntaxError: '+b.err.message,'jsonParser',12);
+        const x=b.val||{};
+        const o=S.orders.get(Number(x.id));
+        if(!o)return legacy(200,{error:'pedido no existe'});
+        switch(x.accion){
+          case 'direccion':o.direccion=x.valor;break;
+          case 'notas':o.notas=x.valor;break;
+          case 'items':
+            if(!Array.isArray(x.valor)||x.valor.some(it=>!it||!cat().bySku.get(it.sku)))return crash("TypeError: Cannot read properties of undefined (reading 'precio')",'calcularTotal',131);
+            o.items=priceItems(x.valor);o.total=totalOf(o.items);break;
+          case 'cancelar':cancelOrder(o);break;
+          default:return legacy(200,{error:'accion no soportada: '+x.accion});
+        }
+        return legacy(200,{ok:true});}
+      default:return null;
+    }
+    return expressNotFound(m,p);
+  }
+
+  /* ---- API v1: lo que el grupo decide ---- */
+  function withIdem(R,scope,fn){
+    if(!d.idem)return fn();
+    const key=R.headers['idempotency-key'];
+    if(!key||!key.trim())return fail(400,'falta-idempotency-key','Falta el encabezado Idempotency-Key','Esta operación exige una clave de idempotencia generada por el cliente, única por intención.');
+    const fp=scope+'\n'+canon(R.body);
+    const prev=S.idem.get(key);
+    if(prev){
+      if(prev.fp!==fp)return fail(422,'clave-reutilizada','Idempotency-Key reutilizada con otra petición','La clave '+key+' ya se usó con una ruta o un cuerpo distintos.');
+      const r=clone(prev.res);r.headers['Idempotent-Replayed']='true';return r;
+    }
+    const r=fn();
+    if(r.status<500)S.idem.set(key,{fp,res:clone(r)});
+    return r;
+  }
+  const notFound=(what,id)=>fail(404,'no-encontrado',what+' no encontrado','No existe '+what.toLowerCase()+' '+id+'.');
+  function created(path,obj){
+    if(!d.codigos)return ok(200,{ok:true,recurso:obj});
+    const h={'Location':path};if(d.cache)h['ETag']=etagOf(obj);
+    return ok(201,obj,h);
+  }
+  function page(R,list,q,keyOf,base,cc){
+    const lim=q.has('limite')?Number(q.get('limite')):50;
+    if(!Number.isInteger(lim)||lim<1||lim>200)return fail(400,'parametro-invalido','Parámetro inválido','limite debe ser un entero entre 1 y 200.');
+    let start=0;
+    if(q.has('cursor')){const i=list.findIndex(x=>String(keyOf(x))===q.get('cursor'));if(i<0)return fail(400,'parametro-invalido','Parámetro inválido','cursor no corresponde a ningún elemento.');start=i+1;}
+    const items=list.slice(start,start+lim);
+    const more=start+lim<list.length;
+    const qs=new URLSearchParams();q.forEach((v,k)=>{if(k!=='cursor'&&k!=='limite')qs.set(k,v);});qs.set('limite',String(lim));
+    const next=more?base+'?'+qs.toString()+'&cursor='+encodeURIComponent(keyOf(items[items.length-1])):null;
+    return representation(R,{items,siguiente:next},cc,next?{'Link':'<'+next+'>; rel="next"'}:null);
+  }
+  const H={
+    productos(R,m,mm,q){
+      let list=cat().list;const c=q.get('categoria');
+      if(c)list=list.filter(x=>x.categoria.toLowerCase()===c.toLowerCase());
+      return page(R,list,q,x=>x.sku,'/productos','public, max-age=60');
+    },
+    producto(R,m,mm){
+      const p=cat().bySku.get(decodeURIComponent(mm[1]));
+      return p?representation(R,p,'public, max-age=60'):notFound('Producto',mm[1]);
+    },
+    pedidos(R,m,mm,q){
+      if(m!=='POST'){
+        let list=[...S.orders.values()];const e=q.get('estado');if(e)list=list.filter(o=>o.estado===e);
+        return page(R,list,q,o=>o.id,'/pedidos','private, no-cache');
+      }
+      return withIdem(R,'POST /pedidos',()=>{
+        const b=parseBody(R.body);if(!b.ok)return fail(400,'json-mal-formado','JSON mal formado',b.err.message);
+        const x=b.val;
+        if(!x||typeof x!=='object'||Array.isArray(x))return fail(400,'cuerpo-invalido','Cuerpo inválido','Se esperaba un objeto JSON.');
+        const errores=[];
+        if(typeof x.cliente!=='string'||!x.cliente.trim())errores.push({campo:'cliente',problema:'obligatorio'});
+        if(typeof x.direccion!=='string'||!x.direccion.trim())errores.push({campo:'direccion',problema:'obligatorio'});
+        errores.push(...validItems(x.items));
+        if(errores.length)return fail(422,'validacion','El pedido no es válido',errores.length+' campo(s) con problemas.',{errores});
+        const o=newOrder(x.cliente,x.items,x.direccion);
+        return created('/pedidos/'+o.id,o);
+      });
+    },
+    pedido(R,m,mm){
+      const o=S.orders.get(Number(mm[1]));
+      if(!o)return notFound('Pedido',mm[1]);
+      if(m!=='PATCH')return representation(R,o,'private, no-cache');
+      const ct=(R.headers['content-type']||'').split(';')[0].trim().toLowerCase();
+      if(ct!=='application/merge-patch+json'&&ct!=='application/json')return fail(415,'tipo-no-soportado','Tipo de contenido no soportado','Use application/merge-patch+json (RFC 7396).',null,{'Accept-Patch':'application/merge-patch+json'});
+      const im=R.headers['if-match'];
+      if(im){const cur=etagOf(o);if(!(im.trim()==='*'||im.split(',').some(x=>x.trim()===cur)))return fail(412,'version-desactualizada','El pedido cambió desde que lo leyeron','ETag actual '+cur+'. Lean el pedido otra vez y reapliquen el cambio.');}
+      const b=parseBody(R.body);if(!b.ok)return fail(400,'json-mal-formado','JSON mal formado',b.err.message);
+      const x=b.val;
+      if(!x||typeof x!=='object'||Array.isArray(x))return fail(400,'cuerpo-invalido','Cuerpo inválido','Un merge patch es un objeto JSON.');
+      const errores=[];const fijos=['id','cliente','total','estado','pagado','creado','cancelacion'];
+      Object.keys(x).forEach(k=>{if(!['direccion','notas','items'].includes(k))errores.push({campo:k,problema:fijos.includes(k)?'no se modifica por PATCH':'campo desconocido'});});
+      if('direccion' in x&&(typeof x.direccion!=='string'||!x.direccion.trim()))errores.push({campo:'direccion',problema:'obligatorio; no admite null'});
+      if('notas' in x&&x.notas!==null&&typeof x.notas!=='string')errores.push({campo:'notas',problema:'texto o null'});
+      if('items' in x)errores.push(...validItems(x.items));
+      if(errores.length)return fail(422,'validacion','El cambio no es válido',errores.length+' campo(s) con problemas.',{errores});
+      if(o.estado==='cancelado')return fail(409,'pedido-cancelado','El pedido está cancelado','Un pedido cancelado no se modifica.');
+      if('items' in x&&(o.estado!=='pendiente'||o.pagado>0))return fail(409,'pedido-no-editable','Los ítems ya no se pueden cambiar','El pedido tiene pagos registrados.');
+      if('direccion' in x)o.direccion=x.direccion;
+      if('notas' in x)o.notas=x.notas;
+      if('items' in x){o.items=priceItems(x.items);o.total=totalOf(o.items);}
+      return d.cache?ok(200,o,{'ETag':etagOf(o)}):ok(200,o);
+    },
+    actualizar(R,m,mm){
+      const o=S.orders.get(Number(mm[1]));
+      if(!o)return notFound('Pedido',mm[1]);
+      const b=parseBody(R.body);if(!b.ok)return fail(400,'json-mal-formado','JSON mal formado',b.err.message);
+      const x=b.val||{};
+      switch(x.accion){
+        case 'direccion':o.direccion=x.valor;break;
+        case 'notas':o.notas=x.valor;break;
+        case 'items':{const e=validItems(x.valor);if(e.length)return fail(422,'validacion','El cambio no es válido','ítems inválidos',{errores:e});o.items=priceItems(x.valor);o.total=totalOf(o.items);break;}
+        case 'cancelar':cancelOrder(o);break;
+        default:return fail(422,'accion-desconocida','Acción no soportada','accion debe ser direccion, notas, items o cancelar.');
+      }
+      return ok(200,o);
+    },
+    pagos(R,m,mm,q){
+      if(m!=='POST'){
+        const o=S.orders.get(Number(mm[1]));if(!o)return notFound('Pedido',mm[1]);
+        return page(R,[...S.payments.values()].filter(p=>p.pedido===o.id),q,p=>p.id,'/pedidos/'+o.id+'/pagos','private, no-cache');
+      }
+      return withIdem(R,'POST /pedidos/'+mm[1]+'/pagos',()=>{
+        const o=S.orders.get(Number(mm[1]));if(!o)return notFound('Pedido',mm[1]);
+        const b=parseBody(R.body);if(!b.ok)return fail(400,'json-mal-formado','JSON mal formado',b.err.message);
+        const x=b.val;
+        if(!x||typeof x!=='object'||Array.isArray(x))return fail(400,'cuerpo-invalido','Cuerpo inválido','Se esperaba un objeto JSON.');
+        const errores=[];
+        if(!Number.isInteger(x.monto)||x.monto<1)errores.push({campo:'monto',problema:'entero positivo en COP'});
+        if(x.medio!=null&&!MEDIOS.includes(x.medio))errores.push({campo:'medio',problema:'uno de '+MEDIOS.join(', ')});
+        if(errores.length)return fail(422,'validacion','El pago no es válido',errores.length+' campo(s) con problemas.',{errores});
+        if(o.estado==='cancelado')return fail(409,'pedido-cancelado','El pedido está cancelado','No se registran pagos sobre un pedido cancelado.');
+        const pg=addPayment(o,x.monto,x.medio);
+        return created('/pedidos/'+o.id+'/pagos/'+pg.id,pg);
+      });
+    },
+    pago(R,m,mm){
+      const pg=S.payments.get(Number(mm[2]));
+      if(!pg||pg.pedido!==Number(mm[1]))return notFound('Pago',mm[2]);
+      return representation(R,pg,'private, no-cache');
+    },
+    cancelacion(R,m,mm){
+      const o=S.orders.get(Number(mm[1]));if(!o)return notFound('Pedido',mm[1]);
+      if(m!=='POST')return o.cancelacion?representation(R,o.cancelacion,'private, no-cache'):fail(404,'no-encontrado','Cancelación no encontrada','El pedido '+o.id+' no está cancelado.');
+      if(o.cancelacion)return ok(200,o.cancelacion,{'Content-Location':'/pedidos/'+o.id+'/cancelacion'});
+      const b=parseBody(R.body);if(!b.ok)return fail(400,'json-mal-formado','JSON mal formado',b.err.message);
+      const x=b.val||{};
+      cancelOrder(o);
+      o.cancelacion={pedido:o.id,fecha:stamp(),motivo:typeof x.motivo==='string'?x.motivo:null,reembolso:o.pagado};
+      return created('/pedidos/'+o.id+'/cancelacion',o.cancelacion);
+    },
+    cancelarGet(R,m,mm){
+      const o=S.orders.get(Number(mm[1]));if(!o)return notFound('Pedido',mm[1]);
+      cancelOrder(o);return ok(200,{ok:true,estado:o.estado});
+    }
+  };
+  const ROUTES=[
+    {re:/^\/productos$/,allow:()=>['GET','HEAD'],h:'productos'},
+    {re:/^\/productos\/([^/]+)$/,allow:()=>['GET','HEAD'],h:'producto'},
+    {re:/^\/pedidos$/,allow:()=>['GET','HEAD','POST'],h:'pedidos'},
+    {re:/^\/pedidos\/(\d+)$/,allow:()=>d.patch?['GET','HEAD','PATCH']:['GET','HEAD'],h:'pedido'},
+    {re:/^\/pedidos\/(\d+)\/actualizar$/,on:()=>!d.patch,allow:()=>['POST'],h:'actualizar'},
+    {re:/^\/pedidos\/(\d+)\/pagos$/,allow:()=>['GET','HEAD','POST'],h:'pagos'},
+    {re:/^\/pedidos\/(\d+)\/pagos\/(\d+)$/,allow:()=>['GET','HEAD'],h:'pago'},
+    {re:/^\/pedidos\/(\d+)\/cancelacion$/,on:()=>d.cancelar,allow:()=>['GET','HEAD','POST'],h:'cancelacion'},
+    {re:/^\/pedidos\/(\d+)\/cancelar$/,on:()=>!d.cancelar,allow:()=>['GET','HEAD'],h:'cancelarGet'}
+  ];
+
+  function handle(req){
+    const m=String(req.method||'GET').toUpperCase();
+    let u;try{u=new URL(req.path||'/','http://api.inventarium.example');}catch(e){u=new URL('/','http://api.inventarium.example');}
+    const p=u.pathname.length>1?u.pathname.replace(/\/+$/,''):u.pathname,q=u.searchParams;
+    const headers={};const rh=req.headers||{};for(const k in rh)headers[k.toLowerCase()]=String(rh[k]);
+    const R={method:m,headers,body:req.body==null?'':String(req.body)};
+    let r=v0(R,m,p,q);
+    if(r===null&&d.recursos){
+      for(const rt of ROUTES){
+        if(rt.on&&!rt.on())continue;
+        const mm=p.match(rt.re);if(!mm)continue;
+        const allow=rt.allow();
+        if(!allow.includes(m))r=d.codigos?mk(405,{'Content-Type':'application/problem+json','Allow':allow.join(', ')},JSON.stringify({type:PTYPE+'metodo-no-permitido',title:'Método no permitido',status:405,detail:m+' no aplica sobre '+p+'.'})):expressNotFound(m,p);
+        else r=H[rt.h](R,m,mm,q);
+        break;
+      }
+    }
+    if(r===null)r=d.recursos&&d.codigos?mk(404,{'Content-Type':'application/problem+json'},JSON.stringify({type:PTYPE+'no-encontrado',title:'Recurso no encontrado',status:404,detail:'No existe '+p+'.'})):expressNotFound(m,p);
+    if(m==='HEAD')r=Object.assign({},r,{body:''});
+    return r;
+  }
+  function seed(){
+    S.now=0;
+    newOrder('ana.rios',[{sku:'SKU-1003',cantidad:1},{sku:'SKU-1010',cantidad:2}],'Cra 7 # 40-62, Bogotá');
+    const o2=newOrder('jorge.ramirez',[{sku:'SKU-1025',cantidad:1}],'Cl 10 # 43E-31, Medellín');
+    addPayment(o2,o2.total,'pse');
+    newOrder('daniela.ospina',[{sku:'SKU-1044',cantidad:3}],'Av 6N # 23-45, Cali');
+  }
+  return{handle,seed,cfg:d,state:S,setConfig(c){Object.assign(d,DEFAULT_CFG,c||{});},setNow(t){S.now=t;},bumpCatalog(){S.catalogVersion++;},catalogVersion:ver};
+}
+
+function richardson(d){
+  if(!d.recursos)return{nivel:0,faltan:['URIs que identifiquen recursos']};
+  const faltan=[];
+  if(!d.codigos)faltan.push('códigos de estado con significado');
+  if(!d.cancelar)faltan.push('un GET sin efectos (la cancelación sigue en GET)');
+  if(!d.patch)faltan.push('un verbo para actualizar (sigue el túnel /actualizar)');
+  return{nivel:faltan.length?1:2,faltan};
+}
+
+/* ---------- simulador de red ---------- */
+const SIM_DEFAULTS={clientes:200,latencia:400,perdida:8,reintentos:3,crawler:true,semilla:2026};
+const TIMEOUT=2;
+function maxAge(h){const cc=h['Cache-Control']||'';const m=cc.match(/max-age=(\d+)/);return m&&!/no-cache|no-store/.test(cc)?Number(m[1]):0;}
+function bodyJSON(r){try{return JSON.parse(r.body);}catch(e){return null;}}
+function simulate(params,cfg,opts){
+  const P=Object.assign({},SIM_DEFAULTS,params||{});
+  const trampa=!!(opts&&opts.trampa);
+  const srv=createServer(cfg,{versionFn:t=>t>=300?2:1});
+  const d=srv.cfg,v1=d.recursos,seed=P.semilla;
+  const M={peticiones:0,r304:0,cacheLocal:0,pedidos:0,pedidosDuplicados:0,cobros:0,cobrosDuplicados:0,cobradoDeMas:0,canceladosGet:0,canceladosPagados:0,bytes:0,kb:0,abandonos:0,timeouts:0,peticionesCrawler:0,replays:0};
+  const log=[];const note=(t,txt)=>{if(log.length<120)log.push({t:Math.round(t*10)/10,txt});};
+  const Q=[];let seq=0;
+  const push=ev=>{ev.seq=seq++;let lo=0,hi=Q.length;while(lo<hi){const mid=(lo+hi)>>1,e=Q[mid];if(e.t<ev.t||(e.t===ev.t&&e.seq<ev.seq))lo=mid+1;else hi=mid;}Q.splice(lo,0,ev);};
+  const C=[];
+  for(let i=0;i<P.clientes;i++){
+    const n=1+Math.floor(rnd(seed,i,'n')*3),items=[];
+    for(let k=0;k<n;k++){const sku='SKU-'+(1001+Math.floor(rnd(seed,i,'sku',k)*120));if(!items.some(x=>x.sku===sku))items.push({sku,cantidad:1+Math.floor(rnd(seed,i,'q',k)*2)});}
+    C.push({i,V:3+Math.floor(rnd(seed,i,'V')*4),items,cache:null,pedido:null,total:0,creados:0,cobros:0});
+    push({t:rnd(seed,i,'start')*600,i,step:'ver',k:0,a:0});
+  }
+  const send=(t,req)=>{srv.setNow(t);const r=srv.handle(req);M.peticiones++;M.bytes+=respBytes(r);if(r.status===304)M.r304++;if(r.headers['Idempotent-Replayed'])M.replays++;return r;};
+  const cname=i=>'cliente '+String(i).padStart(3,'0');
+  const afterView=(c,ev,t)=>{
+    if(ev.k+1<c.V)push({t:t+5+rnd(seed,c.i,'gap',ev.k)*85,i:c.i,step:'ver',k:ev.k+1,a:0});
+    else push({t:t+10+rnd(seed,c.i,'tc')*50,i:c.i,step:'crear',a:0});
+  };
+  while(Q.length){
+    const ev=Q.shift(),c=C[ev.i];
+    const sid=ev.step==='ver'?'ver'+ev.k:ev.step;
+    const lat=-Math.log(1-rnd(seed,ev.i,sid,ev.a,'lat'))*P.latencia/1000;
+    const lost=rnd(seed,ev.i,sid,ev.a,'loss')*100<P.perdida||lat>TIMEOUT;
+    const retryAt=ev.t+TIMEOUT+0.5*Math.pow(2,ev.a),doneAt=ev.t+Math.min(lat,TIMEOUT);
+    const retry=()=>{M.timeouts++;if(ev.a<P.reintentos){push({t:retryAt,i:ev.i,step:ev.step,k:ev.k,a:ev.a+1});return true;}return false;};
+    if(ev.step==='ver'){
+      if(ev.a===0&&c.cache&&ev.t-c.cache.at<c.cache.maxAge){M.cacheLocal++;afterView(c,ev,ev.t);continue;}
+      const h={'Accept':'application/json'};if(c.cache&&c.cache.etag)h['If-None-Match']=c.cache.etag;
+      const r=send(ev.t,{method:'GET',path:v1?'/productos?limite=200':'/getProductos',headers:h});
+      if(lost){if(!retry())afterView(c,ev,ev.t+TIMEOUT);continue;}
+      if(r.status===304&&c.cache){c.cache.at=doneAt;c.cache.maxAge=maxAge(r.headers);}
+      else if(r.status===200){const et=r.headers['ETag'],ma=maxAge(r.headers);c.cache=(et||ma)?{etag:et||null,at:doneAt,maxAge:ma}:null;}
+      afterView(c,ev,doneAt);
+    }else if(ev.step==='crear'){
+      const path=v1?'/pedidos':'/crearPedido';
+      const h={'Content-Type':'application/json'};
+      if(d.idem)h['Idempotency-Key']='ik-'+c.i+'-crear'+(trampa?'-'+ev.a:'');
+      const body=JSON.stringify({cliente:'cliente-'+String(c.i).padStart(3,'0'),items:c.items,direccion:'Cl '+(10+c.i%90)+' # '+(1+c.i%40)+'-'+(10+c.i%60)+', Bogotá'});
+      const before=srv.state.orders.size;
+      const r=send(ev.t,{method:'POST',path,headers:h,body});
+      if(srv.state.orders.size>before){c.creados++;if(c.creados>1)note(ev.t,cname(c.i)+' · reintento '+ev.a+' de POST '+path+' → el servidor creó el pedido '+(srv.state.nextOrder-1)+'; este cliente ya tenía '+(c.creados-1));}
+      else if(r.headers['Idempotent-Replayed'])note(ev.t,cname(c.i)+' · reintento '+ev.a+' de POST '+path+' → misma Idempotency-Key: el servidor repite la respuesta original, no crea nada');
+      if(lost){if(!retry()){M.abandonos++;note(ev.t+TIMEOUT,cname(c.i)+' · se agotan los reintentos: cree que el pedido falló y abandona ('+c.creados+' pedido(s) quedaron creados)');}continue;}
+      const o=bodyJSON(r)||{};const rec=o.recurso||o;
+      const id=rec.id!=null?rec.id:o.id,total=rec.total!=null?rec.total:o.total;
+      if(r.status>=300||id==null){M.abandonos++;continue;}
+      c.pedido=id;c.total=total;
+      push({t:doneAt+5+rnd(seed,c.i,'tp')*25,i:c.i,step:'pagar',a:0});
+    }else{
+      const path=v1?'/pedidos/'+c.pedido+'/pagos':'/pagarPedido';
+      const h={'Content-Type':'application/json'};
+      if(d.idem)h['Idempotency-Key']='ik-'+c.i+'-pagar'+(trampa?'-'+ev.a:'');
+      const body=JSON.stringify(v1?{monto:c.total,medio:'tarjeta'}:{id:c.pedido,monto:c.total,medio:'tarjeta'});
+      const before=srv.state.payments.size;
+      const r=send(ev.t,{method:'POST',path,headers:h,body});
+      if(srv.state.payments.size>before){c.cobros++;if(c.cobros>1)note(ev.t,cname(c.i)+' · reintento '+ev.a+' de POST '+path+' → segundo cobro de $ '+c.total.toLocaleString('es-CO')+' sobre el pedido '+c.pedido);}
+      else if(r.headers['Idempotent-Replayed'])note(ev.t,cname(c.i)+' · reintento '+ev.a+' del pago → misma Idempotency-Key: respuesta original, sin cobrar de nuevo');
+      if(lost){if(!retry()){M.abandonos++;note(ev.t+TIMEOUT,cname(c.i)+' · se agotan los reintentos del pago: cree que no pagó ('+c.cobros+' cobro(s) registrados)');}continue;}
+    }
+  }
+  if(P.crawler){
+    let canc=0;
+    for(const o of [...srv.state.orders.values()]){
+      const prev=o.estado;
+      const links=[v1?'/pedidos/'+o.id:'/pedido?id='+o.id];
+      if(!v1)links.push('/cancelarPedido?id='+o.id);else if(!d.cancelar)links.push('/pedidos/'+o.id+'/cancelar');
+      for(const l of links){srv.setNow(1000);srv.handle({method:'GET',path:l,headers:{'User-Agent':'LinkPreviewBot/2.1'}});M.peticionesCrawler++;}
+      if(prev!=='cancelado'&&o.estado==='cancelado'){M.canceladosGet++;canc++;if(prev==='pagado')M.canceladosPagados++;}
+    }
+    note(1000,'el crawler del panel de pedidos sigue '+M.peticionesCrawler+' enlaces con GET → '+canc+' pedido(s) cancelado(s)');
+  }
+  const porCliente=new Map();
+  for(const o of srv.state.orders.values())porCliente.set(o.cliente,(porCliente.get(o.cliente)||0)+1);
+  M.pedidos=srv.state.orders.size;
+  porCliente.forEach(n=>{M.pedidosDuplicados+=n-1;});
+  const porPedido=new Map();
+  for(const p of srv.state.payments.values()){
+    if(porPedido.has(p.pedido)){M.cobrosDuplicados++;M.cobradoDeMas+=p.monto;}else porPedido.set(p.pedido,p);
+  }
+  M.cobros=srv.state.payments.size;
+  M.kb=M.bytes/1024;
+  log.sort((a,b)=>a.t-b.t);
+  return{P,trampa,cfg:Object.assign({},d),M,log,nivel:richardson(d).nivel};
+}
+
+G.ApiCore={createServer,simulate,richardson,respBytes,catalog,DEFAULT_CFG,SIM_DEFAULTS,etagOf};
+})(typeof window!=='undefined'?window:globalThis);
+</script>
+
+<!-- ===================================================================
+     INTERFAZ
+     =================================================================== -->
+<script>
+(function(){
+'use strict';
+const {createServer,simulate,richardson,respBytes,DEFAULT_CFG,SIM_DEFAULTS}=window.ApiCore;
+const $=(s,r)=>(r||document).querySelector(s);
+const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const fmt=n=>Number(n).toLocaleString('es-CO');
+const cop=n=>'$ '+fmt(Math.round(n));
+const kb=n=>n>=1024?(n/1024).toLocaleString('es-CO',{maximumFractionDigits:1})+' MB':Math.round(n).toLocaleString('es-CO')+' KB';
+const LS='arq1-api-bajo-fuego-v1';
+const T0=Date.now();
+
+/* ---------- contenido ---------- */
+const DECISIONES=[
+  {id:'recursos',t:'Recursos con sustantivos',d:'/productos, /productos/{sku}, /pedidos, /pedidos/{id}, /pedidos/{id}/pagos. Filtros y paginación en la query (?limite, ?cursor) con Link rel="next".',mv:'Habilita las demás decisiones · nivel 1'},
+  {id:'codigos',t:'Códigos de estado y errores con problem+json',d:'201 con Location al crear. 404 si no existe. 400 si el cuerpo no se puede leer; 422 si se lee pero no es válido. 409 si el estado del pedido lo impide. 405 con Allow. Cuerpo de error según RFC 9457.',mv:'Lo que un intermediario puede interpretar'},
+  {id:'idem',t:'Idempotency-Key en los POST',d:'POST /pedidos y POST /pedidos/{id}/pagos exigen la clave (400 si falta). Misma clave y mismo cuerpo: el servidor devuelve la respuesta original sin ejecutar de nuevo. Misma clave con otro cuerpo: 422.',mv:'Pedidos y cobros duplicados'},
+  {id:'cache',t:'ETag, If-None-Match y Cache-Control',d:'El catálogo sale con ETag y Cache-Control: public, max-age=60; una revalidación sin cambios recibe 304 sin cuerpo. Los pedidos llevan ETag y private, no-cache. PATCH acepta If-Match y responde 412 si el pedido cambió.',mv:'KB transferidos y peticiones'},
+  {id:'cancelar',t:'Cancelar sin GET',d:'POST /pedidos/{id}/cancelacion crea la cancelación como recurso de proceso; repetirla devuelve la misma. GET /pedidos/{id}/cancelar desaparece. No se usa DELETE: el pedido cancelado sigue existiendo y se consulta después.',mv:'Pedidos cancelados por un GET'},
+  {id:'patch',t:'PATCH parcial',d:'PATCH /pedidos/{id} con application/merge-patch+json (RFC 7396) para dirección, notas o ítems. Reemplaza el túnel POST /pedidos/{id}/actualizar con su campo «accion».',mv:'Verbo con semántica propia · nivel 2'}
+];
+const V0_EP=['GET /getProductos','GET /getProducto?id=','POST /crearPedido','GET /pedido?id=','POST /pagarPedido','GET /cancelarPedido?id=','POST /actualizarPedido','Transversal (toda la API)'];
+const CATEGORIAS=['Verbo en la URI','GET con efecto (no seguro)','POST reintentable sin clave de idempotencia','Error escondido en un 200','500 por un error del cliente','Fuga de detalle interno','Validación ausente','Endpoint túnel (la acción va en el cuerpo)','Sin caché ni validador (ETag)','Colección sin límite','Crear sin 201 ni Location','Otro'];
+
+/* ---------- estado ---------- */
+function defaults(){return{decisiones:Object.assign({},DEFAULT_CFG),trampa:false,params:Object.assign({},SIM_DEFAULTS),hallazgos:[],historial:[],nHist:0,v0run:null,comp:null,grupo:'',consumo:{},revelado:false};}
+let st;
+try{st=Object.assign(defaults(),JSON.parse(localStorage.getItem(LS)||'{}'));}catch(e){st=defaults();}
+function save(){
+  try{
+    const copy=Object.assign({},st,{historial:st.historial.map(h=>Object.assign({},h,{resBody:h.resBody.length>4000?h.resBody.slice(0,4000)+'\n… (truncado al guardar)':h.resBody}))});
+    localStorage.setItem(LS,JSON.stringify(copy));
+  }catch(e){}
+  renderMd();
+}
+let srv;
+function newConsoleServer(){srv=createServer(st.decisiones);srv.seed();}
+newConsoleServer();
+
+/* ---------- tema ---------- */
+(function(){
+  const b=$('#theme');const modes=['auto','light','dark'];const names={auto:'auto',light:'claro',dark:'oscuro'};
+  let m=localStorage.getItem(LS+'-tema')||'auto';
+  const apply=()=>{if(m==='auto')document.documentElement.removeAttribute('data-theme');else document.documentElement.setAttribute('data-theme',m);b.textContent='Tema: '+names[m];};
+  apply();b.onclick=()=>{m=modes[(modes.indexOf(m)+1)%3];localStorage.setItem(LS+'-tema',m);apply();};
+})();
+
+/* ---------- consola HTTP ---------- */
+const KEY_A=(crypto&&crypto.randomUUID)?crypto.randomUUID():'a1f0c2d4-'+Date.now().toString(16);
+const KEY_B=(crypto&&crypto.randomUUID)?crypto.randomUUID():'b7e3a9c1-'+Date.now().toString(16);
+const total=id=>{const o=srv.state.orders.get(id);return o?o.total:100000;};
+const probe=path=>{const r=srv.handle({method:'GET',path,headers:{}});return r.headers['ETag']||'"(activen ETag en la ronda 3)"';};
+const J=o=>JSON.stringify(o,null,2);
+const EJ_V0=[
+  {l:'Catálogo',m:'GET',p:'/getProductos'},
+  {l:'Producto inexistente',m:'GET',p:'/getProducto?id=SKU-9999'},
+  {l:'Pedido 1001',m:'GET',p:'/pedido?id=1001'},
+  {l:'Pedido inexistente',m:'GET',p:'/pedido?id=9999'},
+  {l:'Crear pedido',m:'POST',p:'/crearPedido',h:'Content-Type: application/json',b:()=>J({cliente:'ana.rios',items:[{sku:'SKU-1003',cantidad:1}],direccion:'Cra 7 # 40-62, Bogotá'})},
+  {l:'Crear sin ítems',m:'POST',p:'/crearPedido',h:'Content-Type: application/json',b:()=>J({cliente:'ana.rios',direccion:'Cra 7 # 40-62, Bogotá'})},
+  {l:'Cantidad negativa',m:'POST',p:'/crearPedido',h:'Content-Type: application/json',b:()=>J({cliente:'ana.rios',items:[{sku:'SKU-1003',cantidad:-3}],direccion:'Cra 7 # 40-62, Bogotá'})},
+  {l:'Pagar 1001',m:'POST',p:'/pagarPedido',h:'Content-Type: application/json',b:()=>J({id:1001,monto:total(1001),medio:'tarjeta'})},
+  {l:'Cancelar 1002 con GET',m:'GET',p:'/cancelarPedido?id=1002'},
+  {l:'Actualizar: acción rara',m:'POST',p:'/actualizarPedido',h:'Content-Type: application/json',b:()=>J({id:1001,accion:'volar'})},
+  {l:'Cambiar ítems de 1002 (pagado)',m:'POST',p:'/actualizarPedido',h:'Content-Type: application/json',b:()=>J({id:1002,accion:'items',valor:[{sku:'SKU-1001',cantidad:1}]})}
+];
+const EJ_V1=[
+  {l:'Catálogo paginado',m:'GET',p:'/productos?limite=5'},
+  {l:'Revalidar catálogo',m:'GET',p:'/productos?limite=5',h:()=>'If-None-Match: '+probe('/productos?limite=5')},
+  {l:'Producto inexistente',m:'GET',p:'/productos/SKU-9999'},
+  {l:'Crear pedido (clave A)',m:'POST',p:'/pedidos',h:()=>'Content-Type: application/json\nIdempotency-Key: '+KEY_A,b:()=>J({cliente:'ana.rios',items:[{sku:'SKU-1003',cantidad:1}],direccion:'Cra 7 # 40-62, Bogotá'})},
+  {l:'Clave A con otro cuerpo',m:'POST',p:'/pedidos',h:()=>'Content-Type: application/json\nIdempotency-Key: '+KEY_A,b:()=>J({cliente:'ana.rios',items:[{sku:'SKU-1003',cantidad:2}],direccion:'Cra 7 # 40-62, Bogotá'})},
+  {l:'Crear inválido',m:'POST',p:'/pedidos',h:()=>'Content-Type: application/json\nIdempotency-Key: '+((crypto&&crypto.randomUUID)?crypto.randomUUID():String(Math.random())),b:()=>J({cliente:'',items:[{sku:'SKU-9999',cantidad:0}]})},
+  {l:'Pagar 1001 (clave B)',m:'POST',p:'/pedidos/1001/pagos',h:()=>'Content-Type: application/json\nIdempotency-Key: '+KEY_B,b:()=>J({monto:total(1001),medio:'tarjeta'})},
+  {l:'PATCH dirección con If-Match',m:'PATCH',p:'/pedidos/1003',h:()=>'Content-Type: application/merge-patch+json\nIf-Match: '+probe('/pedidos/1003'),b:()=>J({direccion:'Cl 100 # 15-20, Bogotá'})},
+  {l:'PATCH con ETag viejo',m:'PATCH',p:'/pedidos/1003',h:'Content-Type: application/merge-patch+json\nIf-Match: "0000dead"',b:()=>J({notas:'timbrar dos veces'})},
+  {l:'Cancelar 1003',m:'POST',p:'/pedidos/1003/cancelacion',h:'Content-Type: application/json',b:()=>J({motivo:'el cliente desiste'})},
+  {l:'Cancelar con GET (v1)',m:'GET',p:'/pedidos/1001/cancelar'},
+  {l:'DELETE pedido',m:'DELETE',p:'/pedidos/1001'}
+];
+const consoles=[];
+function parseHeaders(t){const h={};String(t||'').split('\n').forEach(l=>{const i=l.indexOf(':');if(i>0)h[l.slice(0,i).trim()]=l.slice(i+1).trim();});return h;}
+function statusClass(s){return s<300?'ok':s<400?'neutral':s<500?'warn':'bad';}
+function prettyBody(e){
+  if(!e.resBody)return '';
+  const ct=(e.resHeaders['Content-Type']||'');
+  let t=e.resBody;
+  if(/json/.test(ct)){try{t=JSON.stringify(JSON.parse(t),null,2);}catch(x){}}
+  if(t.length>7000)t=t.slice(0,7000)+'\n… (en pantalla se corta aquí; el cuerpo real mide '+fmt(e.bodyBytes)+' B)';
+  return t;
+}
+function mountConsole(root,variant){
+  root.innerHTML=
+   '<div class="ctl"><span class="eyebrow">Consola HTTP · '+(variant==='v0'?'API v0':'API v0 + v1')+'</span>'+
+   '<div class="tools" style="margin-left:auto">'+(variant==='v1'?'<button type="button" data-k="bump">Publicar cambio de precios</button>':'')+'<button type="button" data-k="reset">Reiniciar datos</button></div></div>'+
+   '<div class="stage-body cons">'+
+   '<div class="reqline"><select data-k="m" aria-label="Método">'+['GET','HEAD','POST','PUT','PATCH','DELETE'].map(x=>'<option>'+x+'</option>').join('')+'</select>'+
+   '<input type="text" data-k="p" value="'+(variant==='v0'?'/getProductos':'/productos?limite=5')+'" spellcheck="false" aria-label="Ruta"><button class="primary" type="button" data-k="send">Enviar</button></div>'+
+   '<div class="panes"><div><h5>Encabezados · uno por línea</h5><textarea data-k="h" rows="3" spellcheck="false" placeholder="Content-Type: application/json"></textarea>'+
+   '<h5 style="margin-top:12px">Cuerpo</h5><textarea data-k="b" rows="8" spellcheck="false"></textarea></div>'+
+   '<div><h5>Respuesta</h5><div class="resp" data-k="r"><div class="empty">Envíen una petición o elijan un ejemplo.</div></div></div></div>'+
+   '<div><h5>Ejemplos</h5><div data-k="note"></div><div class="chips" data-k="chips"></div></div>'+
+   '<div><h5>Historial · la evidencia de los hallazgos sale de aquí</h5><div class="hist" data-k="hist"></div></div></div>';
+  const k=n=>root.querySelector('[data-k="'+n+'"]');
+  const C={root,variant,k};
+  k('send').onclick=()=>sendReq(C);
+  k('p').addEventListener('keydown',e=>{if(e.key==='Enter')sendReq(C);});
+  k('reset').onclick=()=>{newConsoleServer();flash(C,'Datos reiniciados: pedidos 1001, 1002 (pagado) y 1003.');};
+  if(k('bump'))k('bump').onclick=()=>{srv.bumpCatalog();flash(C,'Cambiaron precios del catálogo (versión '+srv.catalogVersion()+'). Revaliden: el ETag ya no coincide.');};
+  consoles.push(C);
+  return C;
+}
+function flash(C,msg){C.k('r').innerHTML='<div class="empty">'+esc(msg)+'</div>';}
+function loadEx(C,ex){
+  C.k('m').value=ex.m;C.k('p').value=ex.p;
+  C.k('h').value=typeof ex.h==='function'?ex.h():(ex.h||'');
+  C.k('b').value=ex.b?ex.b():'';
+}
+function sendReq(C){
+  const req={method:C.k('m').value,path:C.k('p').value.trim()||'/',headers:parseHeaders(C.k('h').value),body:C.k('b').value};
+  srv.setNow((Date.now()-T0)/1000);
+  const r=srv.handle(req);
+  const e={n:++st.nHist,lab:C.variant==='v0'?'01':'03',method:req.method,path:req.path,reqHeaders:C.k('h').value.trim(),reqBody:req.body.trim(),
+    status:r.status,statusText:r.statusText,resHeaders:r.headers,resBody:r.body,size:respBytes(r),bodyBytes:new TextEncoder().encode(r.body).length};
+  st.historial.unshift(e);if(st.historial.length>40)st.historial.length=40;
+  save();renderHist();showResp(C,e);renderEvidence();renderChips();
+}
+function showResp(C,e){
+  const hd=Object.keys(e.resHeaders).map(k=>k+': '+e.resHeaders[k]).join('\n');
+  const body=prettyBody(e);
+  C.k('r').innerHTML='<div class="st"><span class="pill '+statusClass(e.status)+'">'+e.status+' '+esc(e.statusText)+'</span><span>#'+e.n+'</span><span class="count">'+fmt(e.size)+' B en total · cuerpo '+fmt(e.bodyBytes)+' B</span></div>'+
+    '<div class="hd">'+esc(hd||'(sin encabezados)')+'</div>'+(body?'<pre>'+esc(body)+'</pre>':'<div class="empty">sin cuerpo</div>');
+}
+function renderHist(){
+  consoles.forEach(C=>{
+    const box=C.k('hist');
+    if(!st.historial.length){box.innerHTML='<div class="empty" style="display:block;border:0">Todavía no hay peticiones.</div>';return;}
+    box.innerHTML=st.historial.map(e=>'<div data-n="'+e.n+'"><span>#'+e.n+'</span><span>'+esc(e.method)+'</span><span class="p">'+esc(e.path)+'</span><span class="pill '+statusClass(e.status)+'">'+e.status+'</span></div>').join('');
+    box.querySelectorAll('[data-n]').forEach(el=>el.onclick=()=>{
+      const e=st.historial.find(x=>x.n===Number(el.dataset.n));if(!e)return;
+      C.k('m').value=e.method;C.k('p').value=e.path;C.k('h').value=e.reqHeaders;C.k('b').value=e.reqBody;showResp(C,e);
+    });
+  });
+}
+function renderChips(){
+  consoles.forEach(C=>{
+    const list=C.variant==='v0'?EJ_V0:EJ_V1;
+    C.k('note').innerHTML=C.variant==='v1'&&!st.decisiones.recursos?'<p class="narration" style="font-size:13.5px;margin-bottom:8px">Las rutas v1 responden 404 hasta que activen «Recursos con sustantivos».</p>':'';
+    C.k('chips').innerHTML=list.map((x,i)=>'<button type="button" class="chip" data-i="'+i+'">'+esc(x.l)+'</button>').join('');
+    C.k('chips').querySelectorAll('.chip').forEach(b=>b.onclick=()=>loadEx(C,list[Number(b.dataset.i)]));
+  });
+}
+
+/* ---------- hallazgos ---------- */
+function opt(v,l){return '<option value="'+esc(v)+'">'+esc(l==null?v:l)+'</option>';}
+$('#fEp').innerHTML=V0_EP.map(x=>opt(x)).join('');
+$('#fCat').innerHTML=CATEGORIAS.map(x=>opt(x)).join('');
+function renderEvidence(){
+  const sel=$('#fEv'),cur=sel.value;
+  sel.innerHTML=opt('','—')+st.historial.map(e=>opt(String(e.n),'#'+e.n+' '+e.method+' '+e.path.slice(0,28)+' → '+e.status)).join('');
+  sel.value=cur;
+}
+$('#fAdd').onclick=()=>{
+  const ev=$('#fEv').value;
+  if(!ev){alert('Citen una petición del historial como evidencia.');return;}
+  const e=st.historial.find(x=>String(x.n)===ev);
+  st.hallazgos.push({ep:$('#fEp').value,nivel:$('#fNivel').value,cat:$('#fCat').value,ev:Number(ev),evTxt:e?e.method+' '+e.path+' → '+e.status:'',nota:$('#fNota').value.trim()});
+  $('#fNota').value='';save();renderFindings();
+};
+function renderFindings(){
+  $('#hcount').textContent=st.hallazgos.length+' registrados';
+  if(!st.hallazgos.length){$('#hTable').innerHTML='<div class="empty">Sin hallazgos todavía.</div>';return;}
+  $('#hTable').innerHTML='<table class="tbl"><thead><tr><th>#</th><th>Endpoint</th><th>Nivel</th><th>Defecto</th><th>Evidencia</th><th>Qué demuestra</th><th></th></tr></thead><tbody>'+
+    st.hallazgos.map((h,i)=>'<tr'+''+'><td class="m">'+(i+1)+'</td><td class="m">'+esc(h.ep)+'</td><td class="m">'+esc(h.nivel||'—')+'</td><td>'+esc(h.cat)+'</td><td class="m">#'+h.ev+' '+esc(h.evTxt)+'</td><td>'+esc(h.nota)+'</td><td><button type="button" data-del="'+i+'" title="Quitar">×</button></td></tr>').join('')+'</tbody></table>';
+  $('#hTable').querySelectorAll('[data-del]').forEach(b=>b.onclick=()=>{st.hallazgos.splice(Number(b.dataset.del),1);save();renderFindings();});
+}
+
+/* ---------- ronda 2 ---------- */
+const PARAMS=[
+  {k:'clientes',l:'Clientes móviles',o:[50,200,500]},
+  {k:'latencia',l:'Latencia media (ms)',o:[200,400,800,1200]},
+  {k:'perdida',l:'Respuestas perdidas (%)',o:[0,5,10,20]},
+  {k:'reintentos',l:'Reintentos del cliente',o:[0,1,3]}
+];
+function renderParams(){
+  $('#params').innerHTML=PARAMS.map(p=>'<div><span class="lbl">'+p.l+'</span><div class="seg">'+p.o.map(v=>'<button type="button" data-p="'+p.k+'" data-v="'+v+'" class="'+(st.params[p.k]===v?'on':'')+'">'+v+'</button>').join('')+'</div></div>').join('')+
+    '<div><span class="lbl">Carta: pasa un crawler</span><div class="seg"><button type="button" data-cr="1" class="'+(st.params.crawler?'on':'')+'">Sí</button><button type="button" data-cr="0" class="'+(!st.params.crawler?'on':'')+'">No</button></div></div>'+
+    '<div><label class="lbl" for="seed">Semilla de la clase</label><input type="number" id="seed" value="'+st.params.semilla+'"></div>';
+  $('#params').querySelectorAll('[data-p]').forEach(b=>b.onclick=()=>{st.params[b.dataset.p]=Number(b.dataset.v);save();renderParams();});
+  $('#params').querySelectorAll('[data-cr]').forEach(b=>b.onclick=()=>{st.params.crawler=b.dataset.cr==='1';save();renderParams();});
+  $('#seed').onchange=e=>{const v=parseInt(e.target.value,10);st.params.semilla=Number.isFinite(v)?v:2026;save();};
+}
+const paramTxt=P=>P.clientes+' clientes · latencia '+P.latencia+' ms · pérdida '+P.perdida+' % · '+P.reintentos+' reintentos · crawler '+(P.crawler?'sí':'no')+' · semilla '+P.semilla;
+function scoreCards(M){
+  const card=(t,v,p,bad)=>'<div class="card'+(bad?' bad':'')+'"><h6>'+t+'</h6><div class="v">'+v+'</div>'+(p?'<p>'+p+'</p>':'')+'</div>';
+  return card('Peticiones al servidor',fmt(M.peticiones),'más '+fmt(M.peticionesCrawler)+' del crawler')+
+    card('Pedidos duplicados',fmt(M.pedidosDuplicados),fmt(M.pedidos)+' pedidos creados en total',M.pedidosDuplicados>0)+
+    card('Cobros duplicados',fmt(M.cobrosDuplicados),fmt(M.cobros)+' cobros en total',M.cobrosDuplicados>0)+
+    card('Cobrado de más',cop(M.cobradoDeMas),'hay que reembolsarlo',M.cobradoDeMas>0)+
+    card('Cancelados por un GET',fmt(M.canceladosGet),fmt(M.canceladosPagados)+' ya estaban pagados',M.canceladosGet>0)+
+    card('Transferido',kb(M.kb),fmt(M.r304)+' respuestas 304 · '+fmt(M.cacheLocal)+' lecturas desde la caché del cliente')+
+    card('Clientes que abandonan',fmt(M.abandonos),fmt(M.timeouts)+' respuestas que el cliente nunca recibió');
+}
+function logHtml(log){return log.length?log.map(l=>'<div><span class="t">t='+l.t.toLocaleString('es-CO')+' s</span>'+esc(l.txt)+'</div>').join(''):'<div>Sin eventos notables: ningún duplicado, ningún abandono.</div>';}
+$('#runV0').onclick=()=>{
+  const r=simulate(st.params,DEFAULT_CFG);
+  st.v0run={P:r.P,M:r.M,log:r.log.slice(0,60)};save();renderV0();
+};
+function renderV0(){
+  const r=st.v0run;if(!r){$('#v0out').hidden=true;return;}
+  $('#v0out').hidden=false;$('#v0params').textContent=paramTxt(r.P);
+  $('#v0score').innerHTML=scoreCards(r.M);$('#v0log').innerHTML=logHtml(r.log);
+}
+
+/* ---------- ronda 3 ---------- */
+function renderDecs(){
+  $('#decs').innerHTML=DECISIONES.map(x=>{
+    const on=!!st.decisiones[x.id],dis=x.id!=='recursos'&&!st.decisiones.recursos;
+    return '<button type="button" class="dec'+(on?' on':'')+'" data-d="'+x.id+'"'+(dis?' disabled':'')+' aria-pressed="'+on+'"><span class="box">'+(on?'✓':'')+'</span><span><b>'+esc(x.t)+'</b>'+esc(x.d)+'<span class="mv">'+esc(x.mv)+'</span></span></button>';
+  }).join('');
+  $('#decs').querySelectorAll('[data-d]').forEach(b=>b.onclick=()=>{
+    const id=b.dataset.d;st.decisiones[id]=!st.decisiones[id];
+    if(id==='recursos'&&!st.decisiones.recursos)Object.keys(st.decisiones).forEach(k=>{st.decisiones[k]=false;});
+    if(!st.decisiones.idem)st.trampa=false;
+    srv.setConfig(st.decisiones);save();renderDecs();renderChips();renderTool();
+  });
+  const t=st.trampa,dis=!st.decisiones.idem;
+  $('#trapBox').innerHTML='<button type="button" class="dec trap'+(t?' on':'')+'" id="trap"'+(dis?' disabled':'')+' aria-pressed="'+t+'"><span class="box">'+(t?'✓':'')+'</span><span><b>El cliente genera una Idempotency-Key nueva en cada reintento</b>Un error frecuente al implementar el cliente: la clave se crea dentro de la función que envía la petición, no cuando el usuario decide pagar.<span class="mv">'+(dis?'Requiere la decisión de Idempotency-Key':'Actívenla y repitan el caos')+'</span></span></button>';
+  if(!dis)$('#trap').onclick=()=>{st.trampa=!st.trampa;save();renderDecs();};
+  const rl=richardson(st.decisiones);
+  $('#lvl').textContent=rl.nivel;
+  $('#lvlTxt').innerHTML=rl.faltan.length?'Para el nivel '+(rl.nivel+1)+' falta: '+rl.faltan.map(esc).join('; ')+'.':'Recursos, verbos con su semántica y códigos con significado. Es el nivel que se defiende para esta API.';
+}
+const FILAS=[
+  ['peticiones','Peticiones de clientes al servidor',fmt],
+  ['r304','Respuestas 304 (sin cuerpo)',fmt],
+  ['cacheLocal','Lecturas servidas por la caché del cliente',fmt],
+  ['pedidosDuplicados','Pedidos duplicados',fmt],
+  ['cobrosDuplicados','Cobros duplicados',fmt],
+  ['cobradoDeMas','Cobrado de más (COP)',cop],
+  ['canceladosGet','Pedidos cancelados por un GET',fmt],
+  ['canceladosPagados','… de ellos ya pagados',fmt],
+  ['kb','Transferido a los clientes',kb],
+  ['abandonos','Clientes que abandonan',fmt]
+];
+const MALOS=['pedidosDuplicados','cobrosDuplicados','cobradoDeMas','canceladosGet','canceladosPagados'];
+function delta(a,b,k){
+  if(a===b)return '<span class="count" style="margin:0">igual</span>';
+  if(a===0)return '<span class="delta-bad">aparece</span>';
+  const p=Math.round((b-a)/a*100);
+  const better=(k==='r304'||k==='cacheLocal')?b>a:b<a;
+  return '<span class="'+(better?'delta-ok':'delta-bad')+'">'+(p>0?'+':'−')+Math.abs(p)+' %</span>';
+}
+$('#runCmp').onclick=()=>{
+  const a=simulate(st.params,DEFAULT_CFG);
+  const b=simulate(st.params,st.decisiones,{trampa:st.trampa});
+  st.comp={P:a.P,cfg:Object.assign({},st.decisiones),trampa:st.trampa,nivel:b.nivel,A:a.M,B:b.M,log:b.log.slice(0,60)};
+  save();renderCmp();
+};
+function renderCmp(){
+  const c=st.comp;
+  if(!c){$('#cmpOut').innerHTML='';$('#cmpParams').textContent='';return;}
+  $('#cmpParams').textContent=paramTxt(c.P);
+  const decs=DECISIONES.filter(x=>c.cfg[x.id]).map(x=>x.t);
+  const stale=JSON.stringify(c.cfg)!==JSON.stringify(st.decisiones)||c.trampa!==st.trampa;
+  $('#cmpOut').innerHTML=(stale?'<div class="note warn" style="margin:0 0 14px">Cambiaron las decisiones desde la última corrida. Repitan el caos para que la tabla corresponda al contrato actual.</div>':'')+
+    '<p class="narration">v1 de ustedes: '+(decs.length?esc(decs.join(' · ')):'sin decisiones (igual a la v0)')+(c.trampa?' · <b>con la trampa activa</b>':'')+' · nivel '+c.nivel+'.</p>'+
+    '<div class="scroller" style="margin-top:12px"><table class="tbl"><thead><tr><th>Métrica</th><th class="num">v0</th><th class="num">v1</th><th class="num">Cambio</th></tr></thead><tbody>'+
+    FILAS.map(([k,l,f])=>'<tr><td>'+l+'</td><td class="num m">'+f(c.A[k])+'</td><td class="num m"'+(MALOS.includes(k)&&c.B[k]>0?' style="color:var(--bad);font-weight:600"':'')+'>'+f(c.B[k])+'</td><td class="num m">'+delta(c.A[k],c.B[k],k)+'</td></tr>').join('')+
+    '</tbody></table></div><h5 style="margin-top:18px">Lo que vio el servidor con la v1 (muestra)</h5><div class="log">'+logHtml(c.log)+'</div>'+
+    (c.trampa&&c.B.pedidosDuplicados+c.B.cobrosDuplicados>0?'<div class="note bad"><b>La clave no protege si cambia en cada intento.</b> Para el servidor, una clave nueva es una operación nueva. La clave se genera cuando el usuario decide pagar y se guarda hasta recibir una respuesta definitiva.</div>':'');
+}
+
+/* ---------- ronda 4 ---------- */
+const OPCIONES=[
+  {id:'rest',l:'REST + OpenAPI'},{id:'grpc',l:'gRPC'},{id:'graphql',l:'GraphQL'},{id:'evento',l:'Webhook / evento (AsyncAPI)'},{id:'mcp',l:'MCP'}
+];
+const VERED={ok:['ok','Defendible'],costo:['warn','Con costo'],falla:['bad','Falla']};
+const CONSUMIDORES=[
+  {id:'movil',t:'App móvil de clientes',ctx:'La app nativa con la que los clientes compran (iOS y Android). Hay una versión web liviana para quien no instala la app.',r:['Red móvil inestable: respuestas que se pierden, como en la ronda 2','Cuida batería y datos: pocas llamadas, poco tráfico','Cada pantalla necesita datos de pedido, ítems y estado del pago'],
+   c:{rest:['ok','Encaja con lo que diseñaron: ETag ahorra datos y batería, la Idempotency-Key hace seguro reintentar. Costo: una pantalla compleja hace varias idas y vueltas; se mitiga con un Backend for Frontend.'],
+      grpc:['costo','En nativo funciona y el binario sobre HTTP/2 ahorra bytes. Pero la versión web necesita gRPC-Web y un proxy, se pierde la caché HTTP de intermediarios y la depuración con curl. Defendible solo si el equipo ya opera protobuf.'],
+      graphql:['ok','Una ida y vuelta por pantalla con solo los campos que muestra: bueno para red inestable. Costo: las consultas por POST no se cachean en intermediarios (salvo consultas persistidas por GET) y el servidor debe limitar la complejidad. Las mutaciones necesitan la misma clave de idempotencia.'],
+      evento:['falla','Un teléfono no expone un endpoint público para recibir webhooks. Avisarle algo al cliente es una notificación push (APNs o FCM), otro canal. Consultar y crear pedidos sigue necesitando petición y respuesta.'],
+      mcp:['falla','MCP sirve para que una aplicación con un modelo de lenguaje descubra y llame herramientas. La app no tiene un modelo que decida qué llamar: sería JSON-RPC sobre un protocolo pensado para agentes, sin caché HTTP y con una sesión que no aporta nada.']}},
+  {id:'b2b',t:'Socio B2B que integra su ERP',ctx:'Una cadena de tiendas que repone inventario creando pedidos desde su ERP. Su equipo de TI trabaja con contratos formales.',r:['Contrato estable y versionado: un cambio no anunciado les detiene la operación','Generan el cliente desde OpenAPI con su herramienta corporativa','Pasan por el proxy y el WAF de su red corporativa'],
+   c:{rest:['ok','La respuesta natural: contrato OpenAPI versionado, cliente generado, atraviesa proxies y WAF sin negociaciones. Lo que diseñaron en la ronda 3 (códigos, problem+json, idempotencia) es justo lo que un integrador necesita leer.'],
+      grpc:['costo','Contrato fuerte y generación de clientes con protobuf, pero no es lo que pidieron, y la infraestructura corporativa del socio a menudo no deja pasar HTTP/2 de extremo a extremo. Se les cambia el problema en vez de resolverlo.'],
+      graphql:['costo','Esquema tipado, pero el socio necesita pocas operaciones fijas, no consultas flexibles. GraphQL evoluciona deprecando campos, no por versiones, y su generador espera OpenAPI.'],
+      evento:['costo','Útil como complemento para que el ERP se entere de cambios (pedido despachado). Como única opción falla: crear un pedido exige una respuesta inmediata con el id y el total.'],
+      mcp:['falla','El ERP no habla MCP ni tiene un modelo que lea descripciones. No hay un generador de clientes estable para ellos, y el contrato de cada herramienta es su descripción en lenguaje natural más un esquema de entrada: justo lo contrario de un contrato estable y versionado.']}},
+  {id:'panel',t:'Panel interno de reportes',ctx:'El tablero que usan gerencia y operaciones: ventas por día, pedidos por estado, productos más pedidos, pagos pendientes.',r:['Muchas vistas distintas y cambian cada mes','Cruza pedidos, pagos y productos','Lo consume solo gente de la empresa, en el navegador'],
+   c:{rest:['costo','Funciona, pero cada vista nueva pide un endpoint o un parámetro nuevo. Cruzar pedidos, pagos y productos produce N+1 peticiones y transfiere campos que nadie mira.'],
+      grpc:['costo','En el navegador necesita gRPC-Web y un proxy. Cada vista nueva es un método nuevo en el .proto: el mismo problema de REST con más herramientas.'],
+      graphql:['ok','Cada vista pide exactamente lo que necesita y el esquema documenta los datos. El costo de proteger el backend de consultas caras (límites de profundidad y complejidad) es manejable porque el consumidor es interno.'],
+      evento:['costo','Alimentar un almacén analítico con eventos (lecturas separadas de escrituras) es una buena arquitectura de datos, pero el panel sigue consultando ese almacén. Resuelve dónde están los datos, no cómo los pide el panel.'],
+      mcp:['falla','Un panel no es un agente. Si mañana quieren «preguntarle a los datos» con un modelo, ese agente es un consumidor nuevo, con su propio adaptador; no reemplaza al panel.']}},
+  {id:'envios',t:'Sistema de envíos',ctx:'El sistema del operador logístico. Debe alistar el despacho en cuanto un pedido pasa a «pagado».',r:['Tiene que enterarse del cambio de estado, no preguntar por él','No debe sondear la API cada pocos segundos','Si está caído un rato, no puede perder pedidos'],
+   c:{rest:['falla','Solo con REST tiene que sondear GET /pedidos?estado=pagado: o se entera tarde o carga el servidor. El ETag abarata cada sondeo, pero no elimina el sondeo.'],
+      grpc:['costo','Un stream del servidor permite empujar cambios, pero exige una conexión abierta permanente y reconexión con reanudación. Sin un intermediario durable, si envíos está caído se pierden avisos.'],
+      graphql:['falla','Con consultas sigue sondeando. Las subscriptions existen, pero viajan por una conexión persistente con los mismos problemas que el stream de gRPC y sin durabilidad.'],
+      evento:['ok','Un evento PedidoPagado (webhook o broker) le llega sin preguntar, y AsyncAPI documenta el canal como OpenAPI documenta la API. Costo: la entrega es «al menos una vez», así que envíos debe descartar duplicados por id de evento. Publicarlo sin perderlo es el patrón Outbox de microservicios.'],
+      mcp:['falla','MCP lo inicia una aplicación con un modelo que decide llamar una herramienta. Envíos no tiene modelo y lo que necesita es que lo avisen.']}},
+  {id:'agente',t:'Agente de IA de servicio al cliente',ctx:'Un asistente que atiende por chat: consulta el estado de un pedido, cambia la dirección y, si el cliente lo pide, registra el pago.',r:['Descubre en tiempo de ejecución qué herramientas tiene','Decide qué llamar leyendo la descripción de cada herramienta','Reintenta cuando una llamada falla o la respuesta no le sirve'],
+   c:{rest:['costo','Puede usar la API REST si alguien escribe a mano, desde el OpenAPI, la definición de cada herramienta para ese agente. Funciona, pero no hay descubrimiento en tiempo de ejecución y cada aplicación de agente repite ese trabajo.'],
+      grpc:['falla','El modelo no decide leyendo protobuf. Habría que envolver cada método en una herramienta con descripción: se termina construyendo el adaptador igual.'],
+      graphql:['costo','La introspección permite descubrir el esquema, pero dejar que un modelo arme consultas libres arriesga consultas caras y datos que no debía ver. Restringirlo a consultas persistidas las convierte, en la práctica, en herramientas.'],
+      evento:['falla','El agente no tiene un endpoint para recibir eventos y su trabajo es actuar cuando el usuario lo pide, no reaccionar a cambios.'],
+      mcp:['ok','Herramientas con nombre, descripción y esquema de entrada que el agente descubre con tools/list y llama con tools/call. Se implementa como adaptador sobre la API v1: mismas reglas, mismo núcleo. Condiciones: exponer solo lo que el agente debe poder hacer, y toda escritura con Idempotency-Key, porque el agente reintenta.']}}
+];
+function renderCons(){
+  const allDone=CONSUMIDORES.every(c=>st.consumo[c.id]&&st.consumo[c.id].op&&(st.consumo[c.id].just||'').trim());
+  $('#cons5').innerHTML=CONSUMIDORES.map((c,i)=>{
+    const s=st.consumo[c.id]||{};
+    return '<div class="consumer"><header><b>'+(i+1)+' · '+esc(c.t)+'</b>'+(st.revelado&&s.op?'<span class="pill '+VERED[c.c[s.op][0]][0]+'">'+esc(OPCIONES.find(o=>o.id===s.op).l)+': '+VERED[c.c[s.op][0]][1]+'</span>':'')+'</header>'+
+      '<div class="body"><div><p class="narration">'+esc(c.ctx)+'</p><ul>'+c.r.map(x=>'<li>'+esc(x)+'</li>').join('')+'</ul></div>'+
+      '<div><span class="lbl">Cómo se lo exponen</span><div class="opts">'+OPCIONES.map(o=>'<button type="button" data-c="'+c.id+'" data-o="'+o.id+'" class="'+(s.op===o.id?'on':'')+'"'+(st.revelado?' disabled':'')+'>'+esc(o.l)+'</button>').join('')+'</div>'+
+      '<label class="lbl" for="j-'+c.id+'">Por qué (una línea)</label><input type="text" id="j-'+c.id+'" data-j="'+c.id+'" value="'+esc(s.just||'')+'"'+(st.revelado?' disabled':'')+'></div></div>'+
+      (st.revelado?'<div class="reveal">Qué pasa con cada opción:<div class="grid5">'+OPCIONES.map(o=>{const v=c.c[o.id];return '<div class="row'+(s.op===o.id?' sel':'')+'"><b class="mono" style="font-size:12.5px">'+esc(o.l)+'</b><span><span class="pill '+VERED[v[0]][0]+'">'+VERED[v[0]][1]+'</span></span><span>'+esc(v[1])+'</span></div>';}).join('')+'</div></div>':'')+
+      '</div>';
+  }).join('');
+  $('#cons5').querySelectorAll('[data-o]').forEach(b=>b.onclick=()=>{const id=b.dataset.c;st.consumo[id]=Object.assign({},st.consumo[id],{op:b.dataset.o});save();renderCons();});
+  $('#cons5').querySelectorAll('[data-j]').forEach(inp=>inp.oninput=()=>{const id=inp.dataset.j;st.consumo[id]=Object.assign({},st.consumo[id],{just:inp.value});save();updReveal();});
+  updReveal();
+  $('#lab4after').hidden=!st.revelado;
+  if(st.revelado)renderTool();
+}
+function updReveal(){
+  const falt=CONSUMIDORES.filter(c=>!(st.consumo[c.id]&&st.consumo[c.id].op&&(st.consumo[c.id].just||'').trim())).length;
+  const b=$('#revealBtn');
+  if(st.revelado){b.textContent='Volver a elegir';b.disabled=false;$('#revealHint').textContent='Las elecciones quedaron en la entrega. Si vuelven a elegir, la revelación se oculta.';return;}
+  b.textContent='Revelar consecuencias';b.disabled=falt>0;
+  $('#revealHint').textContent=falt?'Faltan '+falt+' consumidor(es) con opción y justificación.':'Listo para revelar.';
+}
+$('#revealBtn').onclick=()=>{st.revelado=!st.revelado;save();renderCons();};
+
+/* La tool MCP equivalente a POST /pedidos/{id}/pagos, generada desde el contrato del grupo */
+function renderTool(){
+  if(!st.revelado)return;
+  const d=st.decisiones,v1=d.recursos;
+  $('#toolSrc').textContent='nivel '+richardson(d).nivel+' · '+(v1?'rutas v1':'rutas v0');
+  const desc=['Registra un pago sobre un pedido existente de Inventarium y devuelve el pago creado.',
+    'Úsela solo cuando el cliente confirme explícitamente que quiere pagar y el monto.',
+    d.idem?'Genere un idempotency_key nuevo por cada intención de pago y reutilice el mismo si reintenta: así un reintento no cobra dos veces.':null,
+    d.codigos?'Si el pedido no existe responde 404; si está cancelado, 409: no reintente en esos casos.':null].filter(Boolean).join(' ');
+  const props={pedido_id:{type:'integer',description:'Id del pedido, tal como lo muestra la consulta del pedido.'},
+    monto:{type:'integer',minimum:1,description:'Valor en pesos colombianos (COP), sin decimales.'},
+    medio:{type:'string',enum:['tarjeta','pse','nequi'],description:'Medio de pago elegido por el cliente.'}};
+  const req=['pedido_id','monto'];
+  if(d.idem){props.idempotency_key={type:'string',description:'Identificador único de esta intención de pago. El mismo valor en cada reintento.'};req.push('idempotency_key');}
+  const tool={name:'registrar_pago_pedido',description:desc,inputSchema:{type:'object',properties:props,required:req}};
+  $('#toolJson').textContent=JSON.stringify(tool,null,2);
+  const call={jsonrpc:'2.0',id:7,method:'tools/call',params:{name:'registrar_pago_pedido',arguments:Object.assign({pedido_id:1001,monto:189900,medio:'tarjeta'},d.idem?{idempotency_key:'pago-1001-conv-88f2'}:{})}};
+  const http=v1?
+    'POST /pedidos/1001/pagos\nContent-Type: application/json'+(d.idem?'\nIdempotency-Key: pago-1001-conv-88f2':'')+'\n\n'+JSON.stringify({monto:189900,medio:'tarjeta'},null,2):
+    'POST /pagarPedido\nContent-Type: application/json\n\n'+JSON.stringify({id:1001,monto:189900,medio:'tarjeta'},null,2);
+  $('#toolMap').textContent='// llega del agente (JSON-RPC 2.0)\n'+JSON.stringify(call,null,2)+'\n\n// el adaptador llama a la API que ya existe\n'+http;
+  const notes=[];
+  notes.push('<b>La descripción es el contrato para el agente.</b> El modelo decide si llama la herramienta, y con qué argumentos, leyendo ese texto. Una descripción ambigua produce llamadas equivocadas igual que un OpenAPI ambiguo produce clientes equivocados.');
+  if(!d.idem)notes.push('<b>Su contrato no exige Idempotency-Key.</b> Si el agente reintenta, el adaptador no tiene cómo distinguir un reintento de un segundo pago: cobra dos veces. Y que el adaptador genere la clave en cada llamada no sirve: es la trampa de la ronda 3.');
+  if(!d.codigos)notes.push('<b>Sin códigos con significado</b>, el adaptador no puede decirle al agente por qué falló: la API responde 200 con un campo error o 500 con una traza. El agente no sabe si reintentar.');
+  if(!v1)notes.push('<b>Sin recursos</b>, el adaptador envuelve /pagarPedido: hereda todos los defectos de la v0 con una interfaz nueva encima.');
+  if(d.idem&&d.codigos&&v1)notes.push('El adaptador no agrega reglas: traduce. Las reglas de negocio siguen en un solo lugar, detrás de la API.');
+  $('#toolNotes').innerHTML=notes.map(n=>'<p>'+n+'</p>').join('');
+}
+
+/* ---------- entrega ---------- */
+function mdTable(head,rows){const cell=x=>String(x==null?'':x).replace(/\|/g,'\\|').replace(/\n/g,' ');return '| '+head.join(' | ')+' |\n|'+head.map(()=>'---').join('|')+'|\n'+rows.map(r=>'| '+r.map(cell).join(' | ')+' |').join('\n');}
+function buildMd(){
+  const L=[];
+  L.push('# Taller API bajo fuego — entrega');
+  L.push('');L.push('**Grupo:** '+(st.grupo||'(sin nombre)'));L.push('**Fecha:** '+new Date().toISOString().slice(0,10));
+  L.push('');L.push('## 1. Hallazgos sobre la API v0');L.push('');
+  L.push(st.hallazgos.length?mdTable(['#','Endpoint','Nivel Richardson','Defecto','Evidencia','Qué demuestra'],st.hallazgos.map((h,i)=>[i+1,h.ep,h.nivel||'—',h.cat,'#'+h.ev+' '+h.evTxt,h.nota])):'_Sin hallazgos registrados._');
+  L.push('');L.push('## 2. Contrato v1: decisiones');L.push('');
+  DECISIONES.forEach(x=>L.push('- ['+(st.decisiones[x.id]?'x':' ')+'] **'+x.t+'.** '+x.d));
+  const rl=richardson(st.decisiones);
+  L.push('');L.push('Nivel de Richardson resultante: **'+rl.nivel+'**'+(rl.faltan.length?' (falta: '+rl.faltan.join('; ')+')':''));
+  L.push('');L.push('## 3. El mismo caos, antes y después');L.push('');
+  const c=st.comp;
+  if(c){
+    L.push('Parámetros: '+paramTxt(c.P)+(c.trampa?' · **trampa activa** (clave nueva por reintento)':''));L.push('');
+    L.push(mdTable(['Métrica','v0','v1'],FILAS.map(([k,l,f])=>[l,f(c.A[k]),f(c.B[k])])));
+    if(JSON.stringify(c.cfg)!==JSON.stringify(st.decisiones)||c.trampa!==st.trampa){L.push('');L.push('> Ojo: las decisiones cambiaron después de esta corrida.');}
+  }else L.push('_No han repetido el caos con la v1._');
+  L.push('');L.push('## 4. La misma capacidad, cinco consumidores');L.push('');
+  L.push(mdTable(['Consumidor','Opción elegida','Justificación del grupo'].concat(st.revelado?['Consecuencia']:[]),CONSUMIDORES.map(cn=>{const s=st.consumo[cn.id]||{};const o=OPCIONES.find(x=>x.id===s.op);const row=[cn.t,o?o.l:'—',s.just||''];if(st.revelado)row.push(s.op?VERED[cn.c[s.op][0]][1]+': '+cn.c[s.op][1]:'—');return row;})));
+  L.push('');L.push('## 5. Peticiones citadas como evidencia');
+  const cited=[...new Set(st.hallazgos.map(h=>h.ev))].sort((a,b)=>a-b);
+  if(!cited.length){L.push('');L.push('_Ninguna._');}
+  cited.forEach(n=>{
+    const e=st.historial.find(x=>x.n===n);if(!e)return;
+    L.push('');L.push('### #'+n+' '+e.method+' '+e.path);L.push('');L.push('```http');
+    L.push(e.method+' '+e.path);if(e.reqHeaders)L.push(e.reqHeaders);if(e.reqBody){L.push('');L.push(e.reqBody);}
+    L.push('');L.push('HTTP/1.1 '+e.status+' '+e.statusText);Object.keys(e.resHeaders).forEach(k=>L.push(k+': '+e.resHeaders[k]));
+    if(e.resBody){L.push('');L.push(e.resBody.length>600?e.resBody.slice(0,600)+' … ('+fmt(e.bodyBytes)+' B)':e.resBody);}
+    L.push('```');
+  });
+  L.push('');
+  return L.join('\n');
+}
+function renderMd(){const el=$('#md');if(el)el.textContent=buildMd();}
+$('#grupo').value=st.grupo;
+$('#grupo').oninput=e=>{st.grupo=e.target.value;save();};
+$('#copyMd').onclick=()=>{const t=buildMd();(navigator.clipboard?navigator.clipboard.writeText(t):Promise.reject()).then(()=>{$('#copyMd').textContent='Copiado';setTimeout(()=>{$('#copyMd').textContent='Copiar';},1500);},()=>{const r=document.createRange();r.selectNodeContents($('#md'));const s=getSelection();s.removeAllRanges();s.addRange(r);});};
+$('#dlMd').onclick=()=>{const blob=new Blob([buildMd()],{type:'text/markdown;charset=utf-8'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='api-bajo-fuego-'+((st.grupo||'grupo').toLowerCase().replace(/[^a-z0-9áéíóúñ]+/g,'-').replace(/^-|-$/g,'')||'grupo')+'.md';document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();},500);};
+$('#resetAll').onclick=()=>{if(!confirm('Se borran hallazgos, decisiones, resultados y el historial de este navegador. ¿Seguir?'))return;st=defaults();localStorage.removeItem(LS);newConsoleServer();boot();};
+
+/* ---------- arranque ---------- */
+function boot(){
+  srv.setConfig(st.decisiones);
+  renderHist();renderChips();renderEvidence();renderFindings();
+  renderParams();renderV0();renderDecs();renderCmp();renderCons();renderMd();
+  $('#grupo').value=st.grupo;
+}
+mountConsole($('#console1'),'v0');
+mountConsole($('#console2'),'v1');
+boot();
+})();
+</script>
+</body>
+</html>
